@@ -6,10 +6,13 @@
 
 import easyocr
 from pdf2image import convert_from_path
+from typing import Callable
+import os
 
 
 
-def extract_text_from_document(input_path: str, output_folder: str) -> str:
+
+def extract_text_from_image(input_path: str, output_path: str, ocrapi: Callable[[str], str]) -> bool:
     """
     Extract text from a document using OCR.
 
@@ -20,21 +23,32 @@ def extract_text_from_document(input_path: str, output_folder: str) -> str:
     Returns:
         str: The extracted text.
     """
-    reader = easyocr.Reader(['ch_tra', 'en'], gpu=True)
 
     # Perform text recognition
-    pages = convert_from_path(input_path, dpi=300)
+    try:
+                    
+        res = ocrapi(input_path)
+        with open(output_path, "w", encoding="utf-8") as file:
+            for bounding_box, text, confidence in res:
+                
+                text = text.replace("黃", "貳") #fix common misrecognition of "貳" as "黃"
+                file.write(f"{confidence:.2f}, {text}\n")  
+        print(f"Successfully OCRed from png {input_path} to txt {output_path}")
+        return True
 
+    except Exception as e:
+        #better error logs 
+        print(e)
+        return False
+    
+if __name__ == "__main__":
+    reader = easyocr.Reader(['ch_tra', 'en'], gpu=True)
+    
+    input_path = "test/input/test.pdf"
+    pages = convert_from_path(input_path, dpi=300)
     for i, page in enumerate(pages):
         page.save(f"test/input/page_{i+1}.png", "PNG")
-        res = reader.readtext(f"test/input/page_{i+1}.png")
-        for bounding_box, text, confidence in res:
-            print(f"Text: {text} (Confidence: {confidence:.2f})")
+        extract_text_from_image(f"test/input/page_{i+1}.png", f"test/output/page_{i+1}.txt", reader.readtext)
+        os.remove(f"test/input/page_{i+1}.png")
         
-        # with open(f"{output_folder}page_{i+1}.txt", "w", encoding="utf-8") as file:
-        #     file.write(extracted_text)
     
-    # return extracted_text
-
-if __name__ == "__main__":
-    extract_text_from_document("test/input/test.pdf", "test/output/")
