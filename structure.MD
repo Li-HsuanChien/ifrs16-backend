@@ -1,3 +1,8 @@
+## File Structure
+    Util files grouped with features
+    Configuration file to plug in ocr, llm apis
+
+
 ## TODO:
     API Call Feature: write a skeleton for api calls
     LLM Extraction calls API feature: Write a prompt 
