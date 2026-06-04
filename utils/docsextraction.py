@@ -9,6 +9,7 @@ from pdf2image import convert_from_path
 from typing import Callable
 import os
 import cv2
+import re
 
 
 
@@ -33,8 +34,8 @@ def extract_text_from_image(input_path: str, output_path: str, ocrapi: Callable[
         with open(output_path, "w", encoding="utf-8") as file:
             for bounding_box, text, confidence in res:
                 
-                text = text.replace("黃", "貳") #fix common misrecognition of "貳" as "黃"
-                file.write(f"{confidence:.2f}, {text}\n")  
+                text = re.sub(r'[a-zA-Z.!\'"^@#%/-{}\[\]]', '', text)
+                file.write(f"{text}")  
         print(f"Successfully OCRed from png {input_path} to txt {output_path}")
         return True
 
@@ -85,6 +86,7 @@ if __name__ == "__main__":
     for i in range(len(pages)):
         with open(f"test/output/page_{i+1}.txt", "r", encoding="utf-8") as file:
             cache.append(file.read())
+        os.remove(f"test/output/page_{i+1}.txt")
     with open(f"test/output/{filename}.txt", "w", encoding="utf-8") as file:
         for text in cache:
             file.write(text)

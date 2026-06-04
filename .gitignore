@@ -6,6 +6,7 @@ __pycache__/
 # C extensions
 *.so
 test/
+tool.py
 *.json
 # Distribution / packaging
 .Python
