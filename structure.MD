@@ -1,6 +1,20 @@
 ## File Structure
     Util files grouped with features
     Configuration file to plug in ocr, llm apis
+    llm prompt files llmcalls.json
+      - for improvable prompts
+      - file content structure
+```json
+  {
+    "task": <title for this llm input object>,
+    "description": <description for this llm input object>,
+    "system_prompts": <input system prompts>,
+    "rules": <ground truth based information>,
+    "examples": <oneshot output example>,
+    "outputSchema": <json schema for output structure> 
+}
+```
+
 
 
 ## TODO:
@@ -231,15 +245,7 @@
     }
   }
 ```     
-    3. calulations and balancing
-        - 邏輯一致性檢查 
-            - 檢查租期、付款金額、折現率等關鍵數據間的邏輯一致性
-        - 金額異常檢測
-            - 檢測異常的租金金額、折現率、總付款額等財務數據
-        - 租期異常檢測
-            - 檢查租期計算、續租條件、提前終止條款的合理性
-        -    條款異常檢測
-            - 檢測合約條款的完整性、一致性及與IFRS 16要求的符合度
+    
     4. endpoint with large package
     
 ## CICD development plan
