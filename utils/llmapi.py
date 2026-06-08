@@ -1,21 +1,35 @@
 import json
-import requests
+import os
+import pathlib
 from typing import List, Dict, Any, Optional
 
+import requests
+
+
+# ---------------------------------------------------------------------------
+# Client
+# ---------------------------------------------------------------------------
 
 class LLMClient:
     def __init__(
         self,
-        base_url: str,
+        azure_endpoint: str,       # e.g. "https://my-resource.openai.azure.com"
+        deployment_name: str,      # e.g. "gpt-4o"
         api_key: str,
-        model: str,
-        headers: Optional[Dict[str, str]] = None,
+        api_version: str = "2024-10-21",
     ):
-        self.base_url = base_url
-        self.api_key = api_key
-        self.model = model
-        self.headers = headers or {
-            "Authorization": f"Bearer {self.api_key}",
+        # Documented URL pattern:
+        # POST https://{endpoint}/openai/deployments/{deployment-id}/chat/completions?api-version=...
+        # Ref: https://learn.microsoft.com/en-us/azure/foundry/openai/reference
+        self.url = (
+            f"{azure_endpoint.rstrip('/')}"
+            f"/openai/deployments/{deployment_name}"
+            f"/chat/completions"
+            f"?api-version={api_version}"
+        )
+        # Documented required request header: api-key (string)
+        self.headers = {
+            "api-key": api_key,
             "Content-Type": "application/json",
         }
 
@@ -30,26 +44,40 @@ class LLMClient:
         Low-level call. `messages` is a fully assembled list of
         {"role": "user"|"assistant", "content": "..."} dicts,
         allowing callers to inject few-shot turns before the real input.
+
+        Azure OpenAI REST differences vs Anthropic:
+          - No top-level `system` field; system prompt goes as the first
+            message with role "system" inside the messages array.
+          - No `model` field in the body; deployment name is in the URL path.
+          - `response_format` accepts:
+              {"type": "json_object"}                          — valid JSON output
+              {"type": "json_schema", "json_schema": {...}}    — structured outputs
+            Ref: https://learn.microsoft.com/en-us/azure/foundry/openai/reference
         """
-        payload = {
-            "model": self.model,
-            "messages": messages,
+        full_messages = []
+        if system_prompt:
+            full_messages.append({"role": "system", "content": system_prompt})
+        full_messages.extend(messages)
+
+        payload: Dict[str, Any] = {
+            "messages": full_messages,
             "temperature": temperature,
         }
 
-        if system_prompt:
-            payload["system"] = system_prompt  # top-level system field (Anthropic style)
-            # For OpenAI-compatible endpoints, prepend as first message instead:
-            # payload["messages"] = [{"role": "system", "content": system_prompt}] + messages
-
         if json_schema:
+            # Use structured outputs (json_schema) when a schema is supplied.
+            # Falls back to json_object mode if the schema is not compatible.
             payload["response_format"] = {
-                "type": "json_object",
-                "json_object": {"name": "schema", "schema": json_schema},
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "extraction_output",
+                    "schema": json_schema,
+                    "strict": True,
+                },
             }
 
         response = requests.post(
-            self.base_url,
+            self.url,
             headers=self.headers,
             data=json.dumps(payload),
             timeout=60,
@@ -161,7 +189,10 @@ def extraction(
     """
     system_prompt = build_system_prompt(task_entry)
     few_shot = build_few_shot_messages(task_entry)
-    live_input = build_user_prompt(contract_text, example_count=len(task_entry.get("examples", [])))
+    live_input = build_user_prompt(
+        contract_text,
+        example_count=len(task_entry.get("examples", [])),
+    )
 
     messages = few_shot + [live_input]
 
@@ -170,32 +201,9 @@ def extraction(
             system_prompt=system_prompt,
             messages=messages,
             json_schema=task_entry.get("outputSchema"),
-            temperature=0.1,  # low temp for deterministic extraction
+            temperature=0.1,
         )
     except Exception as e:
         print(f"[{task_entry.get('task', 'unknown')}] Extraction error: {e}")
         return {}
 
-
-# ---------------------------------------------------------------------------
-# Usage example
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    import pathlib
-
-    client = LLMClient(
-        base_url="https://api.anthropic.com/v1/messages",
-        api_key="YOUR_API_KEY",
-        model="claude-sonnet-4-20250514",
-    )
-
-    llmcalls = json.loads(pathlib.Path("llmcalls_final.json").read_text())
-    contract_text = pathlib.Path("contract.txt").read_text()
-
-    results = {}
-    for task_entry in llmcalls:
-        print(f"Running: {task_entry['task']}")
-        results[task_entry["task"]] = extraction(client, task_entry, contract_text)
-
-    print(json.dumps(results, ensure_ascii=False, indent=2))

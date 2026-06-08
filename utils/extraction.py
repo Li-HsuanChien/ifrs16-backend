@@ -30,6 +30,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
+from flask.cli import load_dotenv
+
 from llmapi import LLMClient, extraction
 
 # ---------------------------------------------------------------------------
@@ -52,22 +54,26 @@ def parse_response(raw: Dict[str, Any], task_name: str) -> Any:
     """
     Unpack the API envelope and return only the structured payload.
 
-    Anthropic /v1/messages response shape:
-        { "content": [{"type": "text", "text": "<json string>"}], ... }
+    Handles two envelope shapes:
 
-    We JSON-parse the text field and return the inner object.
-    Returns an error dict if anything unexpected is found.
+    Azure OpenAI / OpenAI:
+        { "choices": [{ "message": { "content": "<json string>" } }] }
+
+    Anthropic /v1/messages:
+        { "content": [{ "type": "text", "text": "<json string>" }] }
+
+    Returns the parsed inner object, or an error dict on failure.
     """
     if not raw:
         return {"error": "empty_response", "task": task_name}
 
     try:
-        # Anthropic envelope
-        if "content" in raw:
-            text = raw["content"][0]["text"]
-        # OpenAI-compatible envelope (choices[0].message.content)
-        elif "choices" in raw:
+        # Azure OpenAI / OpenAI envelope
+        if "choices" in raw:
             text = raw["choices"][0]["message"]["content"]
+        # Anthropic envelope
+        elif "content" in raw:
+            text = raw["content"][0]["text"]
         else:
             return {"error": "unrecognised_envelope", "raw": raw, "task": task_name}
 
@@ -191,14 +197,13 @@ def flatten_results(results: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    import argparse
-
+    import argparse, os
+    from dotenv import load_dotenv
+    load_dotenv()
     parser = argparse.ArgumentParser(description="IFRS 16 extraction pipeline")
     parser.add_argument("--contract",  default="contract.txt",       help="Path to contract text file")
     parser.add_argument("--tasks",     default="llmcalls.json",      help="Path to llmcalls JSON")
     parser.add_argument("--output",    default="results.json",       help="Path for output JSON")
-    parser.add_argument("--api-key",   default="YOUR_API_KEY",       help="Anthropic API key")
-    parser.add_argument("--model",     default="claude-sonnet-4-20250514", help="Model name")
     parser.add_argument("--workers",   type=int, default=None,       help="Thread pool size (default: min(tasks, 5))")
     parser.add_argument("--retries",   type=int, default=3,          help="Max retries per task")
     parser.add_argument("--flat",      action="store_true",          help="Output flattened payload only (no status/elapsed)")
@@ -209,10 +214,12 @@ if __name__ == "__main__":
     llmcalls      = json.loads(pathlib.Path(args.tasks).read_text(encoding="utf-8"))
 
     client = LLMClient(
-        base_url="https://api.anthropic.com/v1/messages",
-        api_key=args.api_key,
-        model=args.model,
+        azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],   
+        deployment_name=os.environ["LLM_MODEL"],
+        api_key=os.environ["AZURE_OPENAI_KEY"],
+        api_version=os.environ["AZURE_OPENAI_API_VERSION"],
     )
+
 
     # Run
     results = run_pipeline(
