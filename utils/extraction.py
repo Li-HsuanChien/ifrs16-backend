@@ -30,9 +30,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
-from flask.cli import load_dotenv
+from dotenv import load_dotenv
 
-from llmapi import LLMClient, extraction
+from utils.llmapi import LLMClient, extraction
 
 # ---------------------------------------------------------------------------
 # Logging

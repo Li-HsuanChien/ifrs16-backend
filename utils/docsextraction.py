@@ -5,16 +5,21 @@ Pipeline for extracting text from PDF files via OCR or Document AI.
 
 Stages:
     1. PDF  → per-page PNG images  (pdf2image)
-    2. PNG  → text                 (EasyOCR  |  Document AI stub)
+    2. PNG  → text                 (EasyOCR  |  Azure Document Intelligence)
     3. Text → single output file   (flat concat for OCR, structured for Document AI)
 
 Usage (CLI):
     python docsextraction.py input.pdf output.txt --mode ocr --preprocess --dpi 300
+    python docsextraction.py input.pdf output.txt --mode document_ai --backend azure
 
 Usage (library):
     from docsextraction import run, ExtractionMode
 
-    run("input.pdf", "output.txt", mode=ExtractionMode.OCR, preprocess=True)
+    run("input.pdf", "output.txt", mode=ExtractionMode.DOCUMENT_AI, backend="azure")
+
+Azure setup (.env):
+    AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://<your-resource>.cognitiveservices.azure.com/
+    AZURE_DOCUMENT_INTELLIGENCE_KEY=<your-key>
 """
 
 import argparse
@@ -27,7 +32,10 @@ from typing import Callable, Optional
 
 import cv2
 import easyocr
+from dotenv import load_dotenv
 from pdf2image import convert_from_path
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -89,7 +97,42 @@ def preprocess_image(input_path: str, output_path: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Stage 2a – OCR extraction
+# Azure Document Intelligence client factory
+# ---------------------------------------------------------------------------
+def _make_azure_client():
+    """
+    Construct an Azure DocumentAnalysisClient from environment variables.
+
+    Required .env keys:
+        AZURE_DOCUMENTAI_ENDPOINT
+        AZURE_DOCUMENTAI_KEY
+
+    Raises RuntimeError if either variable is missing.
+    Raises ImportError if the Azure SDK is not installed.
+    """
+    try:
+        from azure.ai.documentintelligence import DocumentIntelligenceClient
+        from azure.core.credentials import AzureKeyCredential
+    except ImportError as e:
+        raise ImportError(
+            "Azure SDK not installed. Run: "
+            "pip install azure-ai-documentintelligence azure-core"
+        ) from e
+
+    endpoint = os.getenv("AZURE_DOCUMENTAI_ENDPOINT")
+    key      = os.getenv("AZURE_DOCUMENTAI_KEY")
+
+    if not endpoint or not key:
+        raise RuntimeError(
+            "Azure credentials missing. Set AZURE_DOCUMENTAI_ENDPOINT "
+            "and AZURE_DOCUMENTAI_KEY in your .env file."
+        )
+
+    return DocumentIntelligenceClient(endpoint, AzureKeyCredential(key))
+
+
+# ---------------------------------------------------------------------------
+# Stage 2a – OCR extraction  (EasyOCR)
 # ---------------------------------------------------------------------------
 def ocr_image(image_path: str, ocr_api: OcrApiFunc) -> Optional[str]:
     """Return flat extracted text from one image, or None on failure."""
@@ -108,26 +151,86 @@ def ocr_image(image_path: str, ocr_api: OcrApiFunc) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Stage 2b – Document AI extraction (stub)
+# Stage 2b – Document AI extraction
 # ---------------------------------------------------------------------------
-def document_ai_image(image_path: str, ocr_api: OcrApiFunc) -> Optional[dict]:
-    """
-    Return structured extraction from one image, or None on failure.
-
-    Replace the body with your real Document AI SDK call.
-    Contract: return {"blocks": [{"text": str, "bbox": list, "confidence": float}]}
-    """
+def _document_ai_easyocr(image_path: str, ocr_api: OcrApiFunc) -> Optional[dict]:
+    """EasyOCR-backed structured extraction."""
     try:
         blocks = []
         for bbox, text, confidence in ocr_api(image_path):
             cleaned = re.sub(r'[a-zA-Z.!\'"^@#%/\-{}\[\]]', "", text)
             if cleaned.strip():
                 blocks.append({"text": cleaned, "bbox": bbox, "confidence": confidence})
-        log.info("Document AI: %s → %d blocks", image_path, len(blocks))
+        log.info("Document AI (easyocr): %s → %d blocks", image_path, len(blocks))
         return {"blocks": blocks}
     except Exception:
-        log.exception("Document AI failed for %s", image_path)
+        log.exception("Document AI (easyocr) failed for %s", image_path)
         return None
+
+
+def _document_ai_azure(image_path: str, azure_client) -> Optional[dict]:
+    """
+    Azure Document Intelligence backed structured extraction.
+
+    Uses the prebuilt-read model. Swap the model_id string for
+    'prebuilt-layout', 'prebuilt-invoice', etc. as needed.
+    """
+    try:
+        with open(image_path, "rb") as f:
+            poller = azure_client.begin_analyze_document(
+                model_id="prebuilt-read",
+                body=f,
+                content_type="image/png",
+            )
+        result = poller.result()
+
+        blocks = []
+        for page in result.pages:
+            for line in (page.lines or []):
+                text = line.content.strip()
+                if not text:
+                    continue
+                # Polygon is a flat list [x0,y0,x1,y1,...]; package as bbox.
+                bbox = line.polygon or []
+                blocks.append({
+                    "text":       text,
+                    "bbox":       bbox,
+                    "confidence": getattr(line, "confidence", None),
+                })
+
+        log.info("Document AI (azure): %s → %d blocks", image_path, len(blocks))
+        return {"blocks": blocks}
+    except Exception:
+        log.exception("Document AI (azure) failed for %s", image_path)
+        return None
+
+
+def document_ai_image(
+    image_path:   str,
+    backend:      str,
+    ocr_api:      Optional[OcrApiFunc] = None,
+    azure_client = None,
+) -> Optional[dict]:
+    """
+    Dispatch to the appropriate Document AI backend.
+
+    Args:
+        image_path:   Path to the PNG to analyse.
+        backend:      "easyocr" or "azure".
+        ocr_api:      Required when backend="easyocr".
+        azure_client: Required when backend="azure".
+    """
+    if backend == "azure":
+        if azure_client is None:
+            raise ValueError("azure_client must be provided when backend='azure'")
+        return _document_ai_azure(image_path, azure_client)
+
+    if backend == "easyocr":
+        if ocr_api is None:
+            raise ValueError("ocr_api must be provided when backend='easyocr'")
+        return _document_ai_easyocr(image_path, ocr_api)
+
+    raise ValueError(f"Unknown Document AI backend: {backend!r}. Choose 'easyocr' or 'azure'.")
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +271,7 @@ def run(
     pdf_path:    str,
     output_path: str,
     mode:        ExtractionMode = ExtractionMode.OCR,
+    backend:     str            = "easyocr",
     languages:   list[str]      = None,
     gpu:         bool           = True,
     dpi:         int            = 300,
@@ -176,12 +280,37 @@ def run(
     """
     Full pipeline: PDF → PNGs → text → output file.
 
-    Returns True if all pages extracted cleanly, False if any page failed
-    (output file is still written with placeholders for bad pages).
-    """
-    log.info("Loading EasyOCR (languages=%s, gpu=%s) …", languages or ["ch_tra", "en"], gpu)
-    reader = easyocr.Reader(languages or ["ch_tra", "en"], gpu=gpu)
+    Args:
+        pdf_path:    Source PDF.
+        output_path: Destination text file.
+        mode:        ExtractionMode.OCR or ExtractionMode.DOCUMENT_AI.
+        backend:     "easyocr" (default) or "azure".
+                     Only consulted when mode=DOCUMENT_AI.
+        languages:   EasyOCR language codes (ignored when backend="azure").
+        gpu:         Use GPU for EasyOCR (ignored when backend="azure").
+        dpi:         Rasterisation resolution.
+        preprocess:  Apply adaptive threshold before extraction.
 
+    Returns True if all pages extracted cleanly, False if any page failed.
+    """
+    # -- Initialise backend clients only as needed ---------------------------
+    reader       = None
+    azure_client = None
+
+    needs_easyocr = mode is ExtractionMode.OCR or (
+        mode is ExtractionMode.DOCUMENT_AI and backend == "easyocr"
+    )
+    needs_azure = mode is ExtractionMode.DOCUMENT_AI and backend == "azure"
+
+    if needs_easyocr:
+        log.info("Loading EasyOCR (languages=%s, gpu=%s) …", languages or ["ch_tra", "en"], gpu)
+        reader = easyocr.Reader(languages or ["ch_tra", "en"], gpu=gpu)
+
+    if needs_azure:
+        log.info("Initialising Azure Document Intelligence client …")
+        azure_client = _make_azure_client()   # raises clearly if .env is missing
+
+    # -- Rasterise and extract -----------------------------------------------
     with tempfile.TemporaryDirectory(prefix="pdf_extract_") as tmpdir:
         png_paths = rasterise(pdf_path, tmpdir, dpi=dpi)
         if not png_paths:
@@ -203,9 +332,21 @@ def run(
             if mode is ExtractionMode.OCR:
                 page_results.append(ocr_image(target, reader.readtext))
             else:
-                page_results.append(document_ai_image(target, reader.readtext))
+                page_results.append(
+                    document_ai_image(
+                        target,
+                        backend=backend,
+                        ocr_api=reader.readtext if reader else None,
+                        azure_client=azure_client,
+                    )
+                )
 
-    merged = merge_ocr(page_results) if mode is ExtractionMode.OCR else merge_document_ai(page_results)
+    # -- Merge and write -----------------------------------------------------
+    merged = (
+        merge_ocr(page_results)
+        if mode is ExtractionMode.OCR
+        else merge_document_ai(page_results)
+    )
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
@@ -223,11 +364,13 @@ def run(
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Extract text from a PDF via OCR or Document AI.")
-    p.add_argument("input",  help="Source PDF path.")
-    p.add_argument("output", help="Output text file path.")
-    p.add_argument("--mode", choices=["ocr", "document_ai"], default="ocr")
+    p.add_argument("--input",  help="Source PDF path.")
+    p.add_argument("--output", help="Output text file path.")
+    p.add_argument("--mode",    choices=["ocr", "document_ai"], default="ocr")
+    p.add_argument("--backend", choices=["easyocr", "azure"],   default="easyocr",
+                   help="Document AI backend (only used with --mode document_ai).")
     p.add_argument("--preprocess", action="store_true", help="Adaptive threshold before OCR.")
-    p.add_argument("--dpi", type=int, default=300)
+    p.add_argument("--dpi",  type=int, default=300)
     p.add_argument("--languages", nargs="+", default=["ch_tra", "en"], metavar="LANG")
     p.add_argument("--no-gpu", action="store_true")
     args = p.parse_args()
@@ -236,6 +379,7 @@ if __name__ == "__main__":
         pdf_path    = args.input,
         output_path = args.output,
         mode        = ExtractionMode.OCR if args.mode == "ocr" else ExtractionMode.DOCUMENT_AI,
+        backend     = args.backend,
         languages   = args.languages,
         gpu         = not args.no_gpu,
         dpi         = args.dpi,
