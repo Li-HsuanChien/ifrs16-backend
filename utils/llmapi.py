@@ -205,5 +205,5 @@ def extraction(
         )
     except Exception as e:
         print(f"[{task_entry.get('task', 'unknown')}] Extraction error: {e}")
-        return {}
+        return None
 

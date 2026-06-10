@@ -68,22 +68,55 @@ def parse_response(raw: Dict[str, Any], task_name: str) -> Any:
         return {"error": "empty_response", "task": task_name}
 
     try:
-        # Azure OpenAI / OpenAI envelope
         if "choices" in raw:
-            text = raw["choices"][0]["message"]["content"]
-        # Anthropic envelope
+            choice = raw["choices"][0]
+            # Azure signals refusal or content filter here
+            finish_reason = choice.get("finish_reason")
+            if finish_reason not in ("stop", "length", None):
+                return {"error": f"unexpected_finish_reason:{finish_reason}", "task": task_name}
+            text = choice["message"]["content"]
         elif "content" in raw:
             text = raw["content"][0]["text"]
         else:
             return {"error": "unrecognised_envelope", "raw": raw, "task": task_name}
 
-        return json.loads(text)
+        if not text or not text.strip():
+            return {"error": "empty_content", "task": task_name}
+
+        payload = json.loads(text)
+
+        # An empty object/array is a model failure, not a valid extraction
+        if not payload:
+            return {"error": "empty_payload", "task": task_name}
+
+        return payload
 
     except (KeyError, IndexError, json.JSONDecodeError) as exc:
         log.warning("[%s] parse_response failed: %s", task_name, exc)
         return {"error": str(exc), "raw_text": raw, "task": task_name}
 
+def validate_payload(payload: Any, task_entry: Dict[str, Any], task_name: str) -> Optional[Dict]:
+    """
+    Lightweight structural check: verifies the top-level required keys from
+    the outputSchema are present in the payload.
+    Returns an error dict if invalid, None if ok.
+    """
+    schema = task_entry.get("outputSchema")
+    if not schema:
+        return None  # no schema to validate against
 
+    required_keys = schema.get("required", [])
+    if not required_keys:
+        return None
+
+    if not isinstance(payload, dict):
+        return {"error": "payload_not_object", "task": task_name, "got": type(payload).__name__}
+
+    missing = [k for k in required_keys if k not in payload]
+    if missing:
+        return {"error": "missing_required_keys", "task": task_name, "missing": missing}
+
+    return None
 # ---------------------------------------------------------------------------
 # Single-task runner with retry
 # ---------------------------------------------------------------------------
@@ -114,7 +147,9 @@ def run_task(
             log.info("[%s] attempt %d/%d", task_name, attempt, max_retries)
             raw = extraction(client, task_entry, contract_text)
             payload = parse_response(raw, task_name)
-
+            schema_error = validate_payload(payload, task_entry, task_name)
+            if schema_error:
+                raise ValueError(schema_error["error"])
             elapsed = time.monotonic() - t0
             log.info("[%s] ✓ done in %.1fs", task_name, elapsed)
 

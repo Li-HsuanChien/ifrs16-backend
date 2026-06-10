@@ -199,7 +199,17 @@ async def extract(
         )
 
     output = flatten_results(results) if flat else results
-    return JSONResponse(content=output)
+    
+    # Add wrapper
+    wrapped = {
+        "contractInfo": {
+            "fileName":     file.filename,
+            "uploadDate":   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "analysisDate": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        },
+        **output,
+    }
+    return JSONResponse(content=wrapped)
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +234,7 @@ async def extract_stream(
 
     async def event_stream() -> AsyncGenerator[str, None]:
         loop = asyncio.get_event_loop()
-
+        upload_time = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         with tempfile.TemporaryDirectory(prefix="ifrs16_stream_") as tmpdir:
 
             # ----------------------------------------------------------------
@@ -327,11 +337,20 @@ async def extract_stream(
             ok_count = sum(1 for r in results.values() if r["status"] == "ok")
             output   = flatten_results(results) if flat else results
 
+            wrapped = {
+                "contractInfo": {
+                    "fileName":     file.filename,
+                    "uploadDate":   upload_time, # ← when the PDF arrived
+                    "analysisDate": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), # ← when analysis finished
+                },
+                **output,
+            }
+
             yield _sse({
-                "event":      "done",
-                "tasks_ok":   ok_count,
+                "event":       "done",
+                "tasks_ok":    ok_count,
                 "tasks_total": n,
-                "result":     output,
+                "result":      wrapped,   # ← was just `output`
             })
 
     return StreamingResponse(
