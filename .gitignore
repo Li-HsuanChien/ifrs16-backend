@@ -7,7 +7,6 @@ __pycache__/
 *.so
 test/
 tool.py
-*.json
 # Distribution / packaging
 .Python
 build/
