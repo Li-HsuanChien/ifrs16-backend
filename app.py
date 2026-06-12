@@ -51,6 +51,7 @@ from typing import AsyncGenerator, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from utils.docsextraction import ExtractionMode
 from utils.docsextraction import run as docs_run
@@ -77,7 +78,14 @@ app = FastAPI(
     description="Upload a lease PDF → get structured IFRS 16 JSON back.",
     version="1.0.0",
 )
-
+origins = ["http://localhost:8080"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 # ---------------------------------------------------------------------------
 # Shared state — built once at startup
 # ---------------------------------------------------------------------------
@@ -376,4 +384,4 @@ def health() -> dict:
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
