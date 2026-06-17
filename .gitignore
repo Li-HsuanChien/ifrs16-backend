@@ -11,6 +11,10 @@ tool.py
 .Python
 build/
 develop-eggs/
+.vscode
+*.pdf
+*.txt
+.claude
 dist/
 downloads/
 eggs/

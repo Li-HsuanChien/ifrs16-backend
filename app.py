@@ -31,7 +31,7 @@ Environment variables required (.env):
     AZURE_OPENAI_KEY
     AZURE_OPENAI_API_VERSION
     LLM_MODEL
-    LLMCALLS_PATH   (optional, default: llmcalls.json)
+    LLMCALLS_PATH   (optional, default: parsecalls.json)
 
     # Only when mode=document_ai and backend=azure:
     AZURE_DOCUMENTAI_ENDPOINT
@@ -55,7 +55,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from utils.docsextraction import ExtractionMode
 from utils.docsextraction import run as docs_run
-from utils.extraction import flatten_results, run_pipeline, run_task
+from utils.extraction import flatten_results, pair_tasks, run_pipeline, run_task
 from utils.llmapi import LLMClient
 
 load_dotenv()
@@ -89,13 +89,14 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Shared state — built once at startup
 # ---------------------------------------------------------------------------
-_llm_client: Optional[LLMClient] = None
-_llmcalls:   Optional[list]      = None
+_llm_client:   Optional[LLMClient] = None
+_extractcalls: Optional[list]      = None
+_parsecalls:   Optional[list]      = None
 
 
 @app.on_event("startup")
 def _startup() -> None:
-    global _llm_client, _llmcalls
+    global _llm_client, _extractcalls, _parsecalls
 
     required = ["AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_KEY",
                  "AZURE_OPENAI_API_VERSION", "LLM_MODEL"]
@@ -111,12 +112,19 @@ def _startup() -> None:
     )
     log.info("LLMClient initialised (deployment=%s)", os.environ["LLM_MODEL"])
 
-    llmcalls_path = pathlib.Path(os.getenv("LLMCALLS_PATH", "llmcalls.json"))
-    if not llmcalls_path.exists():
-        raise RuntimeError(f"llmcalls.json not found at: {llmcalls_path.resolve()}")
+    # Step 1 — extraction tasks (full contract → content splices)
+    extractcalls_path = pathlib.Path(os.getenv("EXTRACTIONCALLS_PATH", "extractioncalls.json"))
+    if not extractcalls_path.exists():
+        raise RuntimeError(f"extractioncalls.json not found at: {extractcalls_path.resolve()}")
+    _extractcalls = json.loads(extractcalls_path.read_text(encoding="utf-8"))
+    log.info("Loaded %d extraction task(s) from %s", len(_extractcalls), extractcalls_path)
 
-    _llmcalls = json.loads(llmcalls_path.read_text(encoding="utf-8"))
-    log.info("Loaded %d extraction task(s) from %s", len(_llmcalls), llmcalls_path)
+    # Step 2 — parse tasks (content splices → evaluated output)
+    parsecalls_path = pathlib.Path(os.getenv("LLMCALLS_PATH", "parsecalls.json"))
+    if not parsecalls_path.exists():
+        raise RuntimeError(f"parsecalls.json not found at: {parsecalls_path.resolve()}")
+    _parsecalls = json.loads(parsecalls_path.read_text(encoding="utf-8"))
+    log.info("Loaded %d parse task(s) from %s", len(_parsecalls), parsecalls_path)
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +208,8 @@ async def extract(
 
         results = run_pipeline(
             client        = _llm_client,
-            llmcalls      = _llmcalls,
+            extractcalls  = _extractcalls,
+            parsecalls    = _parsecalls,
             contract_text = contract_text,
             max_workers   = workers,
             max_retries   = retries,
@@ -277,10 +286,11 @@ async def extract_stream(
             })
 
             # ----------------------------------------------------------------
-            # Stage 2 — LLM tasks (yield each as it finishes)
+            # Stage 2 — two-step LLM tasks (yield each as it finishes)
             # ----------------------------------------------------------------
-            n       = len(_llmcalls)
-            workers_count = workers or min(n, 5)
+            pairs   = pair_tasks(_extractcalls, _parsecalls)
+            n       = len(pairs)
+            workers_count = workers or (min(n, 5) if n else 1)
             yield _sse({"event": "llm_started", "tasks": n, "workers": workers_count})
 
             results: dict = {}
@@ -296,9 +306,9 @@ async def extract_stream(
 
                 with ThreadPoolExecutor(max_workers=workers_count) as pool:
                     futures = {
-                        pool.submit(run_task, _llm_client, task_entry,
-                                    contract_text, retries): task_entry
-                        for task_entry in _llmcalls
+                        pool.submit(run_task, _llm_client, extract_entry, parse_entry,
+                                    contract_text, retries): parse_entry
+                        for (extract_entry, parse_entry) in pairs
                     }
                     for future in as_completed(futures):
                         q.put(future.result())
@@ -376,7 +386,7 @@ async def extract_stream(
 # ---------------------------------------------------------------------------
 @app.get("/health", include_in_schema=False)
 def health() -> dict:
-    return {"status": "ok", "tasks_loaded": len(_llmcalls) if _llmcalls else 0}
+    return {"status": "ok", "tasks_loaded": len(_parsecalls) if _parsecalls else 0}
 
 
 # ---------------------------------------------------------------------------

@@ -27,6 +27,8 @@ import logging
 import os
 import re
 import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum, auto
 from typing import Callable, Optional
 
@@ -61,10 +63,15 @@ OcrApiFunc = Callable[[str], OcrResult]
 # ---------------------------------------------------------------------------
 # Stage 1 – PDF → PNG paths
 # ---------------------------------------------------------------------------
-def rasterise(pdf_path: str, tmpdir: str, dpi: int = 300) -> list[str]:
-    """Convert each PDF page to a PNG inside tmpdir; return sorted PNG paths."""
-    log.info("Rasterising %s at %d DPI …", pdf_path, dpi)
-    pages = convert_from_path(pdf_path, dpi=dpi)
+def rasterise(pdf_path: str, tmpdir: str, dpi: int = 300, thread_count: int = 4) -> list[str]:
+    """
+    Convert each PDF page to a PNG inside tmpdir; return sorted PNG paths.
+
+    `thread_count` is passed through to poppler (pdf2image) so page rendering
+    runs in parallel across cores.
+    """
+    log.info("Rasterising %s at %d DPI (thread_count=%d) …", pdf_path, dpi, thread_count)
+    pages = convert_from_path(pdf_path, dpi=dpi, thread_count=thread_count)
     png_paths: list[str] = []
     for i, page in enumerate(pages, start=1):
         png_path = os.path.join(tmpdir, f"page_{i:04d}.png")
@@ -234,6 +241,26 @@ def document_ai_image(
 
 
 # ---------------------------------------------------------------------------
+# Stage 2c – Result validity
+# ---------------------------------------------------------------------------
+def _is_valid_extraction(result, mode: ExtractionMode) -> bool:
+    """
+    A page result is valid only if extraction actually produced text.
+
+    - OCR mode:         a non-empty, non-whitespace string.
+    - Document AI mode: a dict with at least one block.
+
+    None (an extraction failure) is always invalid.
+    """
+    if result is None:
+        return False
+    if mode is ExtractionMode.OCR:
+        return bool(str(result).strip())
+    # Document AI: must have at least one extracted block
+    return isinstance(result, dict) and bool(result.get("blocks"))
+
+
+# ---------------------------------------------------------------------------
 # Stage 3 – Merge
 # ---------------------------------------------------------------------------
 def merge_ocr(page_texts: list[Optional[str]]) -> str:
@@ -270,12 +297,14 @@ def merge_document_ai(page_results: list[Optional[dict]]) -> str:
 def run(
     pdf_path:    str,
     output_path: str,
-    mode:        ExtractionMode = ExtractionMode.OCR,
-    backend:     str            = "easyocr",
+    mode:        ExtractionMode = ExtractionMode.DOCUMENT_AI,
+    backend:     str            = "azure",
     languages:   list[str]      = None,
     gpu:         bool           = True,
     dpi:         int            = 300,
     preprocess:  bool           = False,
+    max_workers: Optional[int]  = None,
+    max_page_retries: int       = 5,
 ) -> bool:
     """
     Full pipeline: PDF → PNGs → text → output file.
@@ -290,6 +319,13 @@ def run(
         gpu:         Use GPU for EasyOCR (ignored when backend="azure").
         dpi:         Rasterisation resolution.
         preprocess:  Apply adaptive threshold before extraction.
+        max_workers: Page-extraction concurrency.  When None, defaults to
+                     parallel for the Azure backend (network-bound) and
+                     sequential for EasyOCR (the torch model is not reliably
+                     thread-safe and a single GPU serialises anyway).
+        max_page_retries: Attempts per page before giving up.  A page whose
+                     extraction returns no text/blocks is retried (with
+                     exponential backoff) instead of silently failing.
 
     Returns True if all pages extracted cleanly, False if any page failed.
     """
@@ -311,16 +347,35 @@ def run(
         azure_client = _make_azure_client()   # raises clearly if .env is missing
 
     # -- Rasterise and extract -----------------------------------------------
+    cpu = os.cpu_count() or 1
     with tempfile.TemporaryDirectory(prefix="pdf_extract_") as tmpdir:
-        png_paths = rasterise(pdf_path, tmpdir, dpi=dpi)
+        png_paths = rasterise(pdf_path, tmpdir, dpi=dpi, thread_count=min(4, cpu))
         if not png_paths:
             log.error("No pages found in %s", pdf_path)
             return False
 
-        page_results = []
-        for i, png_path in enumerate(png_paths, start=1):
-            log.info("Extracting page %d / %d …", i, len(png_paths))
+        n = len(png_paths)
 
+        # Decide page-extraction concurrency.
+        #   Azure  → network/IO-bound, safe to fan out.
+        #   EasyOCR→ shared torch model is not thread-safe; keep sequential.
+        if max_workers is not None:
+            workers = max(1, min(max_workers, n))
+            if needs_easyocr and workers > 1:
+                log.warning(
+                    "EasyOCR is not thread-safe; forcing sequential extraction "
+                    "(requested max_workers=%d).", max_workers
+                )
+                workers = 1
+        else:
+            workers = min(8, n) if needs_azure else 1
+
+        def _extract_page(i: int, png_path: str) -> Optional[object]:
+            """
+            Preprocess (optional) then extract one page, retrying on an invalid
+            result up to `max_page_retries` times with exponential backoff.
+            Returns the last result (valid, or the final invalid one).
+            """
             target = png_path
             if preprocess:
                 pre_path = png_path.replace(".png", "_pre.png")
@@ -329,17 +384,54 @@ def run(
                 else:
                     log.warning("Preprocessing failed for page %d; using original.", i)
 
-            if mode is ExtractionMode.OCR:
-                page_results.append(ocr_image(target, reader.readtext))
-            else:
-                page_results.append(
-                    document_ai_image(
+            last_result = None
+            for attempt in range(1, max_page_retries + 1):
+                if mode is ExtractionMode.OCR:
+                    result = ocr_image(target, reader.readtext)
+                else:
+                    result = document_ai_image(
                         target,
                         backend=backend,
                         ocr_api=reader.readtext if reader else None,
                         azure_client=azure_client,
                     )
-                )
+
+                if _is_valid_extraction(result, mode):
+                    if attempt > 1:
+                        log.info("Page %d recovered on attempt %d/%d.", i, attempt, max_page_retries)
+                    return result
+
+                last_result = result
+                if attempt < max_page_retries:
+                    wait = min(2 ** (attempt - 1), 8)
+                    log.warning(
+                        "Page %d produced no text (attempt %d/%d); retrying in %ds …",
+                        i, attempt, max_page_retries, wait,
+                    )
+                    time.sleep(wait)
+
+            log.error("Page %d still invalid after %d attempts; giving up.", i, max_page_retries)
+            return last_result
+
+        page_results: list = [None] * n
+        log.info("Extracting %d page(s) with %d worker(s) …", n, workers)
+
+        if workers == 1:
+            for idx, png_path in enumerate(png_paths):
+                log.info("Extracting page %d / %d …", idx + 1, n)
+                page_results[idx] = _extract_page(idx + 1, png_path)
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                future_to_idx = {
+                    pool.submit(_extract_page, idx + 1, png_path): idx
+                    for idx, png_path in enumerate(png_paths)
+                }
+                done = 0
+                for future in as_completed(future_to_idx):
+                    idx = future_to_idx[future]
+                    page_results[idx] = future.result()
+                    done += 1
+                    log.info("Extracted page %d / %d (page #%d done)", done, n, idx + 1)
 
     # -- Merge and write -----------------------------------------------------
     merged = (
@@ -353,7 +445,7 @@ def run(
         f.write(merged)
     log.info("Output written to %s (%d chars)", output_path, len(merged))
 
-    failed = sum(1 for r in page_results if r is None)
+    failed = sum(1 for r in page_results if not _is_valid_extraction(r, mode))
     if failed:
         log.warning("Finished with %d/%d page failure(s).", failed, len(page_results))
     return failed == 0
@@ -366,13 +458,17 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Extract text from a PDF via OCR or Document AI.")
     p.add_argument("--input",  help="Source PDF path.")
     p.add_argument("--output", help="Output text file path.")
-    p.add_argument("--mode",    choices=["ocr", "document_ai"], default="ocr")
-    p.add_argument("--backend", choices=["easyocr", "azure"],   default="easyocr",
+    p.add_argument("--mode",    choices=["ocr", "document_ai"], default="document_ai")
+    p.add_argument("--backend", choices=["easyocr", "azure"],   default="azure",
                    help="Document AI backend (only used with --mode document_ai).")
     p.add_argument("--preprocess", action="store_true", help="Adaptive threshold before OCR.")
     p.add_argument("--dpi",  type=int, default=300)
     p.add_argument("--languages", nargs="+", default=["ch_tra", "en"], metavar="LANG")
     p.add_argument("--no-gpu", action="store_true")
+    p.add_argument("--workers", type=int, default=8,
+                   help="Page-extraction concurrency (default: 8 for azure, 1 for easyocr).")
+    p.add_argument("--page-retries", type=int, default=5,
+                   help="Attempts per page before giving up (default: 5).")
     args = p.parse_args()
 
     success = run(
@@ -384,5 +480,7 @@ if __name__ == "__main__":
         gpu         = not args.no_gpu,
         dpi         = args.dpi,
         preprocess  = args.preprocess,
+        max_workers = args.workers,
+        max_page_retries = args.page_retries,
     )
     raise SystemExit(0 if success else 1)

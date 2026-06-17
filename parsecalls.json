@@ -1,8 +1,8 @@
 [
   {
-    "task": "Extract leaseJudgment Info",
-    "description": "Extracting leaseJudgment info using given ifrs16 rules",
-    "system_prompts": "You are an IFRS 16 lease classification expert. Analyze the contract and determine whether it contains a lease by evaluating three criteria in order.\n\nStep 1 — Identified Asset (isSpecificAsset, ref B13–B20):\nDetermine if the contract specifies a particular asset, either explicitly (named/serial number) or implicitly (made available at time of use). Then assess whether the supplier holds a *substantive* substitution right — meaning they have both the practical ability AND would benefit economically from substituting. If either condition is absent, the substitution right is not substantive and the asset is identified. Evaluate at contract inception; exclude unlikely future events.\n\nStep 2 — Economic Benefits (hasControlRight, ref B21–B23):\nDetermine if the customer has the right to obtain substantially all economic benefits from use of the asset throughout the period of use. Consider primary output, by-products, and third-party commercial value. Evaluate only within the defined scope of the customer's right of use. Cash flows paid as consideration (e.g. revenue-share) count as economic benefits obtained by the customer.\n\nStep 3 — Direction of Use (assetReplaceable, ref B25–B30):\nDetermine if the customer has the right to direct *how and for what purpose* the asset is used. This includes: rights to change output type, timing, location, or quantity. Protective rights (usage caps, operating requirements) define scope but do not negate control. If decisions are predetermined by design or contract, check whether the customer still has operating rights or designed the asset.\n\nOutput rules:\n- For each criterion set value to true/false/null, quote or paraphrase the exact contract clause in content, and score confidence 0–100.\n- If evidence is ambiguous or absent, set value to null and lower confidence accordingly.\n- Do not infer intent beyond what the contract states.",
+    "task": "Parse leaseJudgment Info",
+    "description": "Evaluating leaseJudgment from pre-extracted content splices using given ifrs16 rules",
+    "system_prompts": "You are an IFRS 16 lease classification expert. You receive a JSON object whose LeaseJudgment property contains three fields — isSpecificAsset, hasControlRight, and assetReplaceable — each holding a content string of pre-extracted, verbatim contract clauses relevant to that criterion. Base your analysis solely on these provided content splices; do not expect the full contract. Map each criterion to its matching content splice and determine whether the contract contains a lease by evaluating three criteria in order.\n\nStep 1 — Identified Asset (isSpecificAsset, ref B13–B20):\nDetermine if the contract specifies a particular asset, either explicitly (named/serial number) or implicitly (made available at time of use). Then assess whether the supplier holds a *substantive* substitution right — meaning they have both the practical ability AND would benefit economically from substituting. If either condition is absent, the substitution right is not substantive and the asset is identified. Evaluate at contract inception; exclude unlikely future events.\n\nStep 2 — Economic Benefits (hasControlRight, ref B21–B23):\nDetermine if the customer has the right to obtain substantially all economic benefits from use of the asset throughout the period of use. Consider primary output, by-products, and third-party commercial value. Evaluate only within the defined scope of the customer's right of use. Cash flows paid as consideration (e.g. revenue-share) count as economic benefits obtained by the customer.\n\nStep 3 — Direction of Use (assetReplaceable, ref B25–B30):\nDetermine if the customer has the right to direct *how and for what purpose* the asset is used. This includes: rights to change output type, timing, location, or quantity. Protective rights (usage caps, operating requirements) define scope but do not negate control. If decisions are predetermined by design or contract, check whether the customer still has operating rights or designed the asset.\n\nOutput rules:\n- For each criterion set value to true/false/null, quote or paraphrase the relevant text from that criterion's content splice in content, and score confidence 0–100.\n- If a criterion's content splice is empty, or the evidence is ambiguous or absent, set value to null and lower confidence accordingly.\n- Do not infer intent beyond what the provided splices state.",
     "rules": [
       "B13:An asset is typically identified by being explicitly specified in a contract.However, an asset can also be identified by being implicitly specified at the time that the asset is made available for use by the customer.",
       "B14:Even if an asset is specified, a customer does not have the right to use an identified asset if the supplier has the substantive right to substitute the asset throughout the period of use. A suppliers right to substitute an asset is substantive only if both of the following conditions exist: (a) the supplier has the practical ability to substitute alternative assets throughout the period of use (for example, the customer cannot prevent the supplier from substituting the asset and alternative assets are readily available to the supplier or could be sourced by the supplier within a reasonable period of time); and (b) the supplier would benefit economically from the exercise of its right to substitute the asset (ie the economic benefits associated with substituting the asset are expected to exceed the costs associated with substituting the asset).",
@@ -45,7 +45,19 @@
             "userConfirmed": false
           }
         },
-        "source": "高雄市新興區復興一路8號4樓部份位置面積約342坪(下稱外櫃),外櫃之位置(含面積)甲方得因場地營業或改裝之需要予以調整異動乙方同意無條件配合不得異議或請求甲方予以賠(補)償 "
+        "source": {
+            "leaseJudgment": {
+            "isSpecificAsset": {
+              "content": "高雄市新興區復興一路8號4樓部份位置面積約342坪(下稱外櫃)"
+            },
+            "hasControlRight": {
+              "content": "未提及承租人於租賃期間是否有權取得該資產產生的大部分經濟效益,包括產出、收入及成本節省,並得限制其他任何人（包括出租人）使用或享有該資產之效益。"
+            },
+            "assetReplaceable": {
+              "content": "未提及決定資產的使用方式及用途"
+            }
+          } 
+        }
       }
     ],
     "outputSchema": {
@@ -151,9 +163,9 @@
     }
   },
   {
-    "task": "Extract leaseTerms Info",
-    "description": "Extracting leaseTerms info using given ifrs16 rules and ",
-    "system_prompts": "You are an IFRS 16 lease terms extraction specialist. Extract all temporal and structural terms from the contract with precision.\n\nExtract each of the following fields:\n- periodStartDate: The commencement date of the lease (ISO 8601 format).\n- periodEndDate: The end date of the non-cancellable period (ISO 8601 format).\n- nonCancellablePeriod: The minimum enforceable duration in months as an integer.\n- renewalOption: Whether a renewal option exists, and the duration in months if so.\n- reasonablyExpectedToExercise: Based on economic incentives, market conditions, and stated lessee intent, assess whether the renewal option is reasonably certain to be exercised.\n- earlyTermination: Whether an early termination clause exists. If yes, extract any penalty amount and classify penalty type as \"percentage\", \"fixed\", or \"other\".\n- prepayment: Whether any upfront payment is required before the lease commencement, and its amount.\n- finalPayment: Whether a balloon or terminal payment is due at lease end, and its amount.\n\nOutput rules:\n- Set value/hasOption/hasClause/hasPrepayment/hasPayment to null if the contract is silent on that field — do not assume absence means false.\n- Copy the relevant contract clause verbatim or near-verbatim into content.\n- Score confidence 0–100 reflecting textual clarity; reduce confidence when inference is required.\n- All dates must be ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ).\n- Dates may be written in the Republic of China (ROC/民國) calendar. Convert to Gregorian using: Gregorian year = ROC year + 1911. Examples: 民國113年3月15日 → 113+1911=2024 → 2024-03-15T00:00:00.000Z; 民國114年1月1日 → 114+1911=2025 → 2025-01-01T00:00:00.000Z; 民國112年12月31日 → 112+1911=2023 → 2023-12-31T00:00:00.000Z. Do NOT interpret ROC years as 2-digit Gregorian years (民國113年 is NOT 2013 and NOT 2113). If the year is already written in 4-digit Gregorian format (e.g. 2024年), do NOT add 1911. Always compute the arithmetic explicitly before writing the final ISO date.",
+    "task": "Parse leaseTerms Info",
+    "description": "Evaluating leaseTerms from pre-extracted content splices using given ifrs16 rules",
+    "system_prompts": "You are an IFRS 16 lease terms extraction specialist. You receive a JSON object whose LeaseTerms property contains one field per term (periodStartDate, periodEndDate, nonCancellablePeriod, renewalOption, reasonablyExpectedToExercise, earlyTermination, prepayment, finalPayment), each holding a content string of pre-extracted, verbatim contract text relevant to that term. Base your analysis solely on these provided content splices; do not expect the full contract. Parse each field from its matching content splice with precision.\n\nExtract each of the following fields:\n- periodStartDate: The commencement date of the lease (ISO 8601 format).\n- periodEndDate: The end date of the non-cancellable period (ISO 8601 format).\n- nonCancellablePeriod: The minimum enforceable duration in months as an integer.\n- renewalOption: Whether a renewal option exists, and the duration in months if so.\n- reasonablyExpectedToExercise: Based on economic incentives, market conditions, and stated lessee intent, assess whether the renewal option is reasonably certain to be exercised.\n- earlyTermination: Whether an early termination clause exists. If yes, extract any penalty amount and classify penalty type as \"percentage\", \"fixed\", or \"other\".\n- prepayment: Whether any upfront payment is required before the lease commencement, and its amount.\n- finalPayment: Whether a balloon or terminal payment is due at lease end, and its amount.\n\nOutput rules:\n- Set value/hasOption/hasClause/hasPrepayment/hasPayment to null if that field's content splice is empty or silent — do not assume absence means false.\n- Copy the relevant text from that field's content splice verbatim or near-verbatim into content.\n- Score confidence 0–100 reflecting textual clarity; reduce confidence when inference is required.\n- All dates must be ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ).\n- Dates may be written in the Republic of China (ROC/民國) calendar. Convert to Gregorian using: Gregorian year = ROC year + 1911. Examples: 民國113年3月15日 → 113+1911=2024 → 2024-03-15T00:00:00.000Z; 民國114年1月1日 → 114+1911=2025 → 2025-01-01T00:00:00.000Z; 民國112年12月31日 → 112+1911=2023 → 2023-12-31T00:00:00.000Z. Do NOT interpret ROC years as 2-digit Gregorian years (民國113年 is NOT 2013 and NOT 2113). If the year is already written in 4-digit Gregorian format (e.g. 2024年), do NOT add 1911. Always compute the arithmetic explicitly before writing the final ISO date.\n\nDate verification (chain-of-thought, mandatory):\nBefore writing any date value, you must reason through it step by step in this order:\n  Step 1 — Identify the lease commencement date (periodStartDate) first. This is your anchor. Convert it to Gregorian if needed, showing the arithmetic.\n  Step 2 — For periodEndDate: if the contract states a nonCancellablePeriod in months, verify by computing anchor date + N months and confirm it matches any explicit end date in the contract. If they conflict, trust the arithmetic over the literal text and flag the discrepancy in content.\n  Step 3 — Cross-check: confirm that (periodEndDate year) − (periodStartDate year) is consistent with nonCancellablePeriod ÷ 12. If not, recheck your ROC conversion.",
     "rules": "",
     "examples": [
       {
@@ -185,7 +197,7 @@
           },
           "reasonablyExpectedToExercise": {
             "value": true,
-            "reason": "基於市場條件和承租人意圖分析",
+            "content": "基於市場條件和承租人意圖分析",
             "confidence": 75,
             "userConfirmed": false
           },
@@ -212,8 +224,34 @@
             "userConfirmed": false
           }
         },
-        "_conversionNote": "ROC date example: 民國113年1月1日 → 113+1911=2024 → 2024-01-01T00:00:00.000Z (NOT 2013, NOT 2113)",
-        "source": "租賃期間自2024年1月1日起至2026年12月31日止,承租人有權選擇續租2年"
+        "source": {
+          "leaseTerms": {
+            "periodStartDate": {
+              "content": "租賃期間自2024年1月1日起"
+            },
+            "periodEndDate": {
+              "content": "至2026年12月31日止"
+            },
+            "nonCancellablePeriod": {
+              "content": "36個月不可撤銷期間"
+            },
+            "renewalOption": {
+              "content": "承租人有權選擇續租2年"
+            },
+            "reasonablyExpectedToExercise": {
+              "content": "基於市場條件和承租人意圖分析"
+            },
+            "earlyTermination": {
+              "content": "合約中未發現提前終止條款"
+            },
+            "prepayment": {
+              "content": "無預付款項"
+            },
+            "finalPayment": {
+              "content": "無期末尾款"
+            }
+          }
+        }
       }
     ],
     "outputSchema": {
@@ -353,7 +391,7 @@
                 "confidence": {
                   "type": "number"
                 },
-                "reason": {
+                "content": {
                   "type": "string"
                 },
                 "userConfirmed": {
@@ -368,7 +406,7 @@
               },
               "required": [
                 "value",
-                "reason",
+                "content",
                 "confidence",
                 "userConfirmed"
               ],
@@ -510,17 +548,17 @@
     }
   },
   {
-    "task": "Extract paymentTerms Info",
-    "description": "Extracting paymentTerms info using given ifrs16 rules and ",
-    "system_prompts": "You are an IFRS 16 payment schedule extraction specialist. Extract every distinct payment period from the contract as a chronologically ordered list.\n\nFor each payment period, extract:\n- periodicRent: The fixed rent amount for that period (numeric, in contract currency).\n- frequency: Payment interval — one of: \"monthly\", \"quarterly\", \"semi-annual\", \"annual\".\n- timing: Whether payment is due at the start (\"advance\") or end (\"arrears\") of each period.\n- periodStartDate / periodEndDate: The calendar start and end of this rate period (ISO 8601).\n- variableRent: Whether rent in this period contains a variable component. If yes, classify type as \"cpi\", \"rate\", \"revenue\", or \"other\".\n- variableRentPredictable: If variable rent exists, assess whether it can be reliably estimated at commencement (e.g. CPI-linked with known index = predictable; usage-based = not predictable). Set isPredictable to null if variableRent.hasVariable is false.\n\nOutput rules:\n- Create one object per distinct rate period, even if frequency and timing are identical.\n- Sort the list chronologically by periodStartDate ascending.\n- If a field cannot be determined from the contract, set its value/amount/type to null and explain briefly in content or reason.\n- Confidence reflects textual certainty per field, scored 0–100.\n- Dates may be written in the Republic of China (ROC/民國) calendar. Convert to Gregorian using: Gregorian year = ROC year + 1911. Examples: 民國113年3月15日 → 113+1911=2024 → 2024-03-15T00:00:00.000Z; 民國114年1月1日 → 114+1911=2025 → 2025-01-01T00:00:00.000Z; 民國112年12月31日 → 112+1911=2023 → 2023-12-31T00:00:00.000Z. Do NOT interpret ROC years as 2-digit Gregorian years (民國113年 is NOT 2013 and NOT 2113). If the year is already written in 4-digit Gregorian format (e.g. 2024年), do NOT add 1911. Always compute the arithmetic explicitly before writing the final ISO date.",
+    "task": "Parse paymentTerms Info",
+    "description": "Evaluating paymentTerms from pre-extracted content splices using given ifrs16 rules",
+    "system_prompts": "You are an IFRS 16 payment schedule extraction specialist. You receive a JSON object whose PaymentTerms property is an array of pre-extracted rate-period objects, each field (periodicRent, frequency, timing, periodStartDate, periodEndDate, variableRent, variableRentPredictable) holding a content string of verbatim contract text relevant to that field for that period. Base your analysis solely on these provided content splices; do not expect the full contract. Parse every distinct payment period as a chronologically ordered list, using the matching content splice for each field.\n\nFor each payment period, extract:\n- periodicRent: The fixed rent amount for that period (numeric, in contract currency).\n- frequency: Payment interval — one of: \"monthly\", \"quarterly\", \"semi-annual\", \"annual\".\n- timing: Whether payment is due at the start (\"advance\") or end (\"arrears\") of each period.\n- periodStartDate / periodEndDate: The calendar start and end of this rate period (ISO 8601).\n- variableRent: Whether rent in this period contains a variable component. If yes, classify type as \"cpi\", \"rate\", \"revenue\", or \"other\".\n- variableRentPredictable: If variable rent exists, assess whether it can be reliably estimated at commencement (e.g. CPI-linked with known index = predictable; usage-based = not predictable). Set isPredictable to null if variableRent.hasVariable is false.\n\nOutput rules:\n- Create one object per distinct rate period, even if frequency and timing are identical.\n- Sort the list chronologically by periodStartDate ascending.\n- If a field cannot be determined from its content splice, set its value/amount/type to null and explain briefly in content or reason.\n- Confidence reflects textual certainty per field, scored 0–100.\n- Dates may be written in the Republic of China (ROC/民國) calendar. Convert to Gregorian using: Gregorian year = ROC year + 1911. Examples: 民國113年3月15日 → 113+1911=2024 → 2024-03-15T00:00:00.000Z; 民國114年1月1日 → 114+1911=2025 → 2025-01-01T00:00:00.000Z; 民國112年12月31日 → 112+1911=2023 → 2023-12-31T00:00:00.000Z. Do NOT interpret ROC years as 2-digit Gregorian years (民國113年 is NOT 2013 and NOT 2113). If the year is already written in 4-digit Gregorian format (e.g. 2024年), do NOT add 1911. Always compute the arithmetic explicitly before writing the final ISO date.\n\nDate verification (chain-of-thought, mandatory):\nBefore writing any periodStartDate or periodEndDate, reason through it step by step:\n  Step 1 — Identify the lease commencement date from the provided content splices (typically the earliest periodStartDate splice). This is your anchor. Convert it to Gregorian if needed, showing the ROC arithmetic explicitly (e.g. 民國113年 → 113+1911=2024).\n  Step 2 — For relative period expressions (e.g. 第一年至第三年, 第四年至第六年), derive dates by adding years to the anchor. Do NOT read a year number from the contract text for these — compute it.\n    Example: anchor = 2024-01-01, 第一年至第三年 → periodStartDate = 2024-01-01, periodEndDate = 2024-01-01 + 3 years − 1 day = 2026-12-31.\n    Example: anchor = 2024-01-01, 第四年至第六年 → periodStartDate = 2024-01-01 + 3 years = 2027-01-01, periodEndDate = 2024-01-01 + 6 years − 1 day = 2029-12-31.\n  Step 3 — Verify the periods are contiguous: periodStartDate of period N+1 must be exactly one day after periodEndDate of period N. If not, recheck.\n  Step 4 — Verify the final periodEndDate matches the lease end date from leaseTerms. If they conflict, flag it in content.",
     "rules": "",
     "examples": [
       {
         "paymentTerms": [
           {
             "periodicRent": {
-              "amount": 50000,
-              "content": "第一年至第三年新台幣50,000元",
+              "amount": 37500,
+              "content": "第一年至第三年固定未稅新台幣參萬柒仟伍佰元整元",
               "confidence": 95,
               "userConfirmed": false
             },
@@ -557,15 +595,21 @@
             },
             "variableRentPredictable": {
               "isPredictable": null,
-              "reason": "不適用",
+              "content": "不適用",
               "confidence": 0,
+              "userConfirmed": false
+            },
+            "taxed":{
+              "isTaxed": false,
+              "content": "固定未稅",
+              "confidence": 100,
               "userConfirmed": false
             }
           },
           {
             "periodicRent": {
-              "amount": 51500,
-              "content": "第四年至第六年新台幣51,500元",
+              "amount": 38700,
+              "content": "第四年至第六年固定未稅新台幣參萬捌仟柒佰元整",
               "confidence": 95,
               "userConfirmed": false
             },
@@ -602,14 +646,151 @@
             },
             "variableRentPredictable": {
               "isPredictable": null,
-              "reason": "不適用",
+              "content": "不適用",
               "confidence": 0,
+              "userConfirmed": false
+            },
+            "taxed":{
+              "isTaxed": false,
+              "content": "固定未稅",
+              "confidence": 100,
+              "userConfirmed": false
+            }
+          },
+          {
+            "periodicRent": {
+              "amount": 40000,
+              "content": "第七年起至租約屆滿為固定未稅肆萬元整",
+              "confidence": 95,
+              "userConfirmed": false
+            },
+            "frequency": {
+              "value": "monthly",
+              "content": "每月繳納",
+              "confidence": 90,
+              "userConfirmed": false
+            },
+            "timing": {
+              "value": "advance",
+              "content": "每月1日前繳納",
+              "confidence": 90,
+              "userConfirmed": false
+            },
+            "periodStartDate": {
+              "value": "2030-01-01T00:00:00.000Z",
+              "content": "第七年起至租約屆滿",
+              "confidence": 95,
+              "userConfirmed": false
+            },
+            "periodEndDate": {
+              "value": null,
+              "content": "租約屆滿",
+              "confidence": 95,
+              "userConfirmed": false
+            },
+            "variableRent": {
+              "hasVariable": false,
+              "type": null,
+              "content": "無變動租金條款",
+              "confidence": 85,
+              "userConfirmed": false
+            },
+            "variableRentPredictable": {
+              "isPredictable": null,
+              "content": "不適用",
+              "confidence": 0,
+              "userConfirmed": false
+            },
+            "taxed":{
+              "isTaxed": false,
+              "content": "固定未稅",
+              "confidence": 100,
               "userConfirmed": false
             }
           }
         ],
-        "_conversionNote": "ROC date example: 民國113年1月1日 → 113+1911=2024 → 2024-01-01T00:00:00.000Z (NOT 2013, NOT 2113)",
-        "source": "外櫃每月租金(含稅):第一年至第三年為新台幣壹拾伍萬參什玖佰元整第四年至第六年為壹拾伍萬捌仟伍佰壹拾柒元整"
+        "source": {
+          "paymentTerms": [
+            {
+              "periodicRent": {
+                "content": "第一年至第三年固定未稅新台幣參萬柒仟伍佰元整元"
+              },
+              "frequency": {
+                "content": "每月繳納"
+              },
+              "timing": {
+                "content": "每月1日前繳納"
+              },
+              "periodStartDate": {
+                "content": "第一年至第三年"
+              },
+              "periodEndDate": {
+                "content": "第一年至第三年"
+              },
+              "variableRent": {
+                "content": "無變動租金條款"
+              },
+              "variableRentPredictable": {
+                "content": "不適用"
+              },
+              "taxed":{
+                "content": "固定未稅"
+              }
+            },
+            {
+              "periodicRent": {
+                "content": "第四年至第六年固定未稅新台幣參萬捌仟柒佰元整"
+              },
+              "frequency": {
+                "content": "每月繳納"
+              },
+              "timing": {
+                "content": "每月1日前繳納"
+              },
+              "periodStartDate": {
+                "content": "第四年至第六年"
+              },
+              "periodEndDate": {
+                "content": "第四年至第六年"
+              },
+              "variableRent": {
+                "content": "無變動租金條款"
+              },
+              "variableRentPredictable": {
+                "content": "不適用"
+              },
+              "taxed":{
+                "content": "固定未稅"
+              }
+            },
+            {
+              "periodicRent": {
+                "content": "第七年起至租約屆滿為固定未稅肆萬元整"
+              },
+              "frequency": {
+                "content": "每月繳納"
+              },
+              "timing": {
+                "content": "每月1日前繳納"
+              },
+              "periodStartDate": {
+                "content": "第七年起"
+              },
+              "periodEndDate": {
+                "content": "租約屆滿"
+              },
+              "variableRent": {
+                "content": "無變動租金條款"
+              },
+              "variableRentPredictable": {
+                "content": "不適用"
+              },
+              "taxed":{
+                "content": "固定未稅"
+              }
+            }
+          ]
+        }
       }
     ],
     "outputSchema": {
@@ -765,7 +946,7 @@
                       "null"
                     ]
                   },
-                  "reason": {
+                  "content": {
                     "type": "string"
                   },
                   "userConfirmed": {
@@ -774,7 +955,7 @@
                 },
                 "required": [
                   "isPredictable",
-                  "reason",
+                  "content",
                   "confidence",
                   "userConfirmed"
                 ],
@@ -843,6 +1024,33 @@
                   "userConfirmed"
                 ],
                 "type": "object"
+              },
+              "taxed": {
+                "additionalProperties": false,
+                "properties": {
+                  "confidence": {
+                    "type": "number"
+                  },
+                  "isTaxed": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "userConfirmed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "isTaxed",
+                  "content",
+                  "confidence",
+                  "userConfirmed"
+                ],
+                "type": "object"
               }
             },
             "required": [
@@ -852,7 +1060,8 @@
               "variableRent",
               "variableRentPredictable",
               "periodStartDate",
-              "periodEndDate"
+              "periodEndDate",
+              "taxed"
             ],
             "type": "object"
           },
@@ -866,9 +1075,9 @@
     }
   },
   {
-    "task": "Extract costSeparation Info",
-    "description": "Extracting costSeparation info using given IFRS 16 rules, supporting multi-period lease structures with per-term component splits.",
-    "system_prompts": "You are an IFRS 16 lease component allocation specialist. Separate the total contract consideration into lease and non-lease components for each distinct rate period in the contract.\n\nA new period begins whenever the lease or non-lease amounts, percentages, or allocation basis changes. Extract one object per distinct period, sorted chronologically.\n\nFor each period, extract:\n- periodStartDate / periodEndDate: The calendar start and end of this allocation period (ISO 8601).\n- leaseComponent: Payments for the right to use the identified asset itself (e.g. base rent, asset access fees).\n- nonLeaseComponent: Payments for associated services or goods that are separable and could be sourced independently (e.g. maintenance, insurance, management fees, utilities).\n\nFor each component (lease and non-lease) extract:\n- amount: The absolute monetary amount allocated to this component for this period.\n- percentage: The proportion of total contract consideration for this period (lease + non-lease = 100%).\n- allocationMethod: How the split was determined — typically \"relative_standalone_price\" if based on observable prices, or describe the method used.\n- contractReference: The specific clause or section in the contract that identifies this component (e.g. \"Article 5 – Rent Schedule\").\n- confidence: Score 0–100 based on how explicitly the contract specifies each component.\n- userConfirmed: Always false on initial extraction.\n\nOutput rules:\n- leaseComponent.percentage + nonLeaseComponent.percentage must equal 100 within each period object.\n- If the contract does not separately price components, apply the cost 100% to lease component, in other words, make the period start end and amount of lease component exactly as the rent price start and end date\n- If no non-lease components exist in a period, set nonLeaseComponent.amount to 0 and percentage to 0 with a clear contractReference explanation.\n- If only one period exists in the contract, return an array with a single object.\n- Sort all period objects chronologically by periodStartDate ascending.\n- Dates may be written in the Republic of China calendar (民國年). Convert them to Gregorian by adding 1911 to the ROC year (e.g. 民國114年5月3日 → 2025-05-03) before populating any date field. If you the period does not express a periodEndDate, Use the lease's term end date",
+    "task": "Parse costSeparation Info",
+    "description": "Evaluating costSeparation from pre-extracted content splices using given IFRS 16 rules, supporting multi-period lease structures with per-term component splits.",
+    "system_prompts": "You are an IFRS 16 lease component allocation specialist. You receive a JSON object whose CostSeparation property is an array of pre-extracted period objects, each field (periodStartDate, periodEndDate, leaseComponent, nonLeaseComponent) holding a content string of verbatim contract text relevant to that field. Base your analysis solely on these provided content splices; do not expect the full contract. Separate the total consideration into lease and non-lease components for each distinct rate period described by the splices.\n\nA new period begins whenever the lease or non-lease amounts, percentages, or allocation basis changes. Parse one object per distinct period, sorted chronologically.\n\nFor each period, extract:\n- periodStartDate / periodEndDate: The calendar start and end of this allocation period (ISO 8601).\n- leaseComponent: Payments for the right to use the identified asset itself (e.g. base rent, asset access fees).\n- nonLeaseComponent: Payments for associated services or goods that are separable and could be sourced independently (e.g. maintenance, insurance, management fees, utilities).\n\nFor each component (lease and non-lease) extract:\n- amount: The absolute monetary amount allocated to this component for this period.\n- percentage: The proportion of total contract consideration for this period (lease + non-lease = 100%).\n- allocationMethod: How the split was determined — typically \"relative_standalone_price\" if based on observable prices, or describe the method used.\n- contractReference: The specific clause or section in the contract that identifies this component (e.g. \"Article 5 – Rent Schedule\").\n- confidence: Score 0–100 based on how explicitly the contract specifies each component.\n- userConfirmed: Always false on initial extraction.\n\nOutput rules:\n- leaseComponent.percentage + nonLeaseComponent.percentage must equal 100 within each period object.\n- If the contract does not separately price components, apply the cost 100% to lease component, in other words, make the period start end and amount of lease component exactly as the rent price start and end date\n- If no non-lease components exist in a period, set nonLeaseComponent.amount to 0 and percentage to 0 with a clear contractReference explanation.\n- If only one period exists in the contract, return an array with a single object.\n- Sort all period objects chronologically by periodStartDate ascending.\n- Dates may be written in the Republic of China calendar (民國年). Convert them to Gregorian by adding 1911 to the ROC year (e.g. 民國114年5月3日 → 2025-05-03) before populating any date field. If you the period does not express a periodEndDate, Use the lease's term end date",
     "rules": "",
     "examples": [
       {
@@ -934,7 +1143,38 @@
             }
           }
         ],
-        "source": "第5條 - 租金明細第一年至第三年租賃物租金為47000元,第7條管理費3000元;第四年至第六年租金48500元,管理費3100元"
+        "source": {
+          "costSeparation": [
+            {
+              "periodStartDate": {
+                "content": "第一年至第三年"
+              },
+              "periodEndDate": {
+                "content": "第一年至第三年"
+              },
+              "leaseComponent": {
+                "content": "第5條 - 租金明細 第一年至第三年租賃物租金為47000元"
+              },
+              "nonLeaseComponent": {
+                "content": "第7條 管理費3000元"
+              }
+            },
+            {
+              "periodStartDate": {
+                "content": "第四年至第六年"
+              },
+              "periodEndDate": {
+                "content": "第四年至第六年"
+              },
+              "leaseComponent": {
+                "content": "第四年至第六年租金48500元"
+              },
+              "nonLeaseComponent": {
+                "content": "管理費3100元"
+              }
+            }
+          ]
+        }
       }
     ],
     "outputSchema": {
@@ -1091,29 +1331,38 @@
     }
   },
   {
-    "task": "Extract discountRate Info",
-    "description": "Extracting discountRate info using given ifrs16 rules and ",
-    "system_prompts": "You are an IFRS 16 discount rate extraction specialist. Identify the applicable discount rate(s) from the contract and context.\n\nExtract two rates:\n- implicitRate: The interest rate implicit in the lease, if it can be determined from the contract (i.e. the rate that makes the present value of lease payments and residual value equal to the asset's fair value). This is typically disclosed explicitly by the lessor.\n- incrementalBorrowingRate (IBR): The rate the lessee would pay to borrow funds over a similar term with similar security, used when the implicit rate cannot be readily determined.\n\nOutput rules:\n- If a rate is explicitly stated in the contract, extract it as a decimal (e.g. 4.5% → 0.045) and cite the source clause.\n- If a rate is not disclosed or cannot be calculated from available data, set rate to null and set source to a brief explanation (e.g. \"Not disclosed in contract\").\n- Do NOT fabricate or estimate rates — only extract what is verifiable from the contract or stated context.\n- Always include the currency of the lease in the currency field.\n- Score confidence 0–100; a rate not mentioned in the contract should have confidence 0.",
+    "task": "Parse discountRate Info",
+    "description": "Evaluating discountRate from pre-extracted content splices using given ifrs16 rules",
+    "system_prompts": "You are an IFRS 16 discount rate extraction specialist. You receive a JSON object whose DiscountRate property contains two fields — implicitRate and incrementalBorrowingRate — each holding a content string of pre-extracted, verbatim contract text relevant to that rate. Base your analysis solely on these provided content splices; do not expect the full contract. Identify the applicable discount rate(s) from these splices.\n\nExtract two rates:\n- implicitRate: The interest rate implicit in the lease, if it can be determined from the contract (i.e. the rate that makes the present value of lease payments and residual value equal to the asset's fair value). This is typically disclosed explicitly by the lessor.\n- incrementalBorrowingRate (IBR): The rate the lessee would pay to borrow funds over a similar term with similar security, used when the implicit rate cannot be readily determined.\n\nOutput rules:\n- If a rate is explicitly stated in the provided splice, extract it as a decimal (e.g. 4.5% → 0.045) and cite the source clause.\n- If a rate is not disclosed or cannot be calculated from available data, set rate to null and set source to a brief explanation (e.g. \"Not disclosed in contract\").\n- Do NOT fabricate or estimate rates — only extract what is verifiable from the provided splices.\n- Always include the currency of the lease in the currency field.\n- Score confidence 0–100; a rate not mentioned in the contract should have confidence 0.",
     "rules": "",
     "examples": [
       {
         "discountRate": {
           "incrementalBorrowingRate": {
             "rate": 0.045,
-            "source": "市場利率分析",
+            "content": "市場利率分析",
             "currency": "TWD",
             "confidence": 80,
             "userConfirmed": false
           },
           "implicitRate": {
             "rate": null,
-            "source": "合約中未披露",
+            "content": "合約中未披露",
             "currency": "TWD",
             "confidence": 0,
             "userConfirmed": false
           }
         },
-        "source": "合約未明確揭露隱含利率,根據市場利率分析承租人增量借款利率約為4.5%"
+        "source": {
+          "discountRate": {
+            "incrementalBorrowingRate": {
+              "content": "根據市場利率分析承租人增量借款利率約為4.5%"
+            },
+            "implicitRate": {
+              "content": "合約未明確揭露隱含利率"
+            }
+          }
+        }
       }
     ],
     "outputSchema": {
@@ -1137,7 +1386,7 @@
                     "null"
                   ]
                 },
-                "source": {
+                "content": {
                   "type": "string"
                 },
                 "userConfirmed": {
@@ -1146,7 +1395,7 @@
               },
               "required": [
                 "rate",
-                "source",
+                "content",
                 "currency",
                 "confidence",
                 "userConfirmed"
@@ -1168,7 +1417,7 @@
                     "null"
                   ]
                 },
-                "source": {
+                "content": {
                   "type": "string"
                 },
                 "userConfirmed": {
@@ -1177,7 +1426,7 @@
               },
               "required": [
                 "rate",
-                "source",
+                "content",
                 "currency",
                 "confidence",
                 "userConfirmed"

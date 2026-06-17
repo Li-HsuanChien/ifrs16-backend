@@ -123,42 +123,60 @@ def build_few_shot_messages(task_entry: Dict[str, Any]) -> List[Dict[str, str]]:
     """
     Converts the `examples` list into alternating user/assistant message pairs.
 
-    Each example becomes:
-      user:      "Extract the following contract text: <GROUND_TRUTH_PLACEHOLDER>"
-      assistant: <the example output as a JSON string>
+    Each example is expected to carry a `source` field holding the *input* the
+    model would receive for that example:
+      - extraction step: `source` is the raw contract text (a string)
+      - parse step:      `source` is the structured content object emitted by
+                         the extraction step
 
-    Using a placeholder for the input signals to the model that this is a
-    demonstration of output format and reasoning, not real contract text.
-    The model never sees actual contract text in the few-shot turns — only
-    the expected structured output.
+    The pair becomes:
+      user:      "<source>"                  ← the demonstrated input
+      assistant: <example minus `source`>    ← the expected structured output
+
+    If an example has no `source`, a placeholder is used for the input so the
+    turn still demonstrates the output format.
     """
     messages = []
     for i, example in enumerate(task_entry.get("examples", []), start=1):
-        messages.append({
-            "role": "user",
-            "content": (
+        demo = dict(example)
+        source = demo.pop("source", None)
+
+        if source is None:
+            user_content = (
                 f"[Example {i}] Extract the structured information from the "
-                f"following contract text:\n\n<contract_text_placeholder_{i}>"
-            ),
-        })
+                f"following input:\n\n<input_placeholder_{i}>"
+            )
+        else:
+            source_text = (
+                source if isinstance(source, str)
+                else json.dumps(source, ensure_ascii=False, indent=2)
+            )
+            user_content = (
+                f"[Example {i}] Extract the structured information from the "
+                f"following input:\n\n{source_text}"
+            )
+
+        messages.append({"role": "user", "content": user_content})
         messages.append({
             "role": "assistant",
-            "content": json.dumps(example, ensure_ascii=False, indent=2),
+            "content": json.dumps(demo, ensure_ascii=False, indent=2),
         })
     return messages
 
 
-def build_user_prompt(contract_text: str, example_count: int = 0) -> Dict[str, str]:
+def build_user_prompt(input_text: str, example_count: int = 0) -> Dict[str, str]:
     """
-    Wraps the real contract text in a user message that mirrors the
-    few-shot format, so the model recognises it as the live extraction task.
+    Wraps the real input in a user message that mirrors the few-shot format.
+
+    `input_text` is the raw contract text for the extraction step, or the
+    serialized content object (from the extraction step) for the parse step.
     """
     prefix = f"[Input {example_count + 1}] " if example_count else ""
     return {
         "role": "user",
         "content": (
             f"{prefix}Extract the structured information from the "
-            f"following contract text:\n\n{contract_text}"
+            f"following input:\n\n{input_text}"
         ),
     }
 
@@ -170,27 +188,32 @@ def build_user_prompt(contract_text: str, example_count: int = 0) -> Dict[str, s
 def extraction(
     client: LLMClient,
     task_entry: Dict[str, Any],
-    contract_text: str,
+    input_text: str,
 ) -> Dict[str, Any]:
     """
-    Runs a single extraction task against a real contract.
+    Runs a single LLM call for one task against `input_text`.
+
+    Used for both pipeline steps:
+      - extraction step: `input_text` is the raw contract text
+      - parse step:      `input_text` is the serialized content object produced
+                         by the extraction step
 
     Message layout sent to the API:
     ┌──────────────────────────────────────────┐
     │ system   : system_prompts + rules        │  ← ground truth / instructions
     ├──────────────────────────────────────────┤
-    │ user     : [Example 1] <placeholder>    │  ┐
+    │ user     : [Example 1] <source input>   │  ┐
     │ assistant: { ...example output... }     │  │ few-shot demonstration
-    │ user     : [Example N] <placeholder>    │  │ (repeated per example)
+    │ user     : [Example N] <source input>   │  │ (repeated per example)
     │ assistant: { ...example output... }     │  ┘
     ├──────────────────────────────────────────┤
-    │ user     : [Input N+1] <real contract>  │  ← live input
+    │ user     : [Input N+1] <real input>     │  ← live input
     └──────────────────────────────────────────┘
     """
     system_prompt = build_system_prompt(task_entry)
     few_shot = build_few_shot_messages(task_entry)
     live_input = build_user_prompt(
-        contract_text,
+        input_text,
         example_count=len(task_entry.get("examples", [])),
     )
 

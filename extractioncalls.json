@@ -1,0 +1,629 @@
+[
+  {
+    "task": "Extract leaseJudgment",
+    "description": "Extracting the contract clauses relevant to IFRS 16 lease judgment (identified asset, economic benefits, direction of use) into per-field text splices for downstream classification.",
+    "system_prompts": "You are an IFRS 16 document retrieval assistant. Your only job is to locate and extract the portions of the input contract that are relevant to determining whether the contract contains a lease, and to route each extracted passage to the correct field. Do NOT classify, judge, score, or draw conclusions — only pull the relevant source text.\n\nScan the entire document and assign relevant text to each of the following fields:\n- isSpecificAsset: text that names, describes, or specifies a particular asset (explicit identifiers such as name, serial number, address, area, floor; or an asset implicitly made available for use), and any text about the supplier's right or obligation to substitute, replace, relocate, or swap the asset and the conditions attached.\n- hasControlRight: text describing who obtains the output, by-products, revenue, cost savings, or other economic benefits from using the asset, and any restrictions on others (including the supplier) using or benefiting from it.\n- assetReplaceable: text describing who decides how and for what purpose the asset is used — rights to change output type, timing, location, or quantity; operating and maintenance rights; protective rights such as usage caps; and any predetermined use by design or contractual restriction.\n\nExtraction rules:\n- Copy the relevant text verbatim from the document. Do not paraphrase, translate, summarize, convert dates, or reformat. Preserve the original language exactly as written.\n- Place each relevant passage in the content of the field it belongs to. If several passages belong to the same field, concatenate them in document order separated by newlines.\n- If no relevant text is found for a field, set its content to an empty string.\n\nOutput a single JSON object that mirrors the structure below, where every field contains only a \"content\" string holding the extracted source text. Output nothing else.",
+    "rules": [],
+    "examples": [
+      {
+        "leaseJudgment": {
+          "isSpecificAsset": {
+            "content": "高雄市新興區復興一路8號4樓部份位置面積約342坪(下稱外櫃)"
+          },
+          "hasControlRight": {
+            "content": "未提及承租人於租賃期間是否有權取得該資產產生的大部分經濟效益,包括產出、收入及成本節省,並得限制其他任何人（包括出租人）使用或享有該資產之效益。"
+          },
+          "assetReplaceable": {
+            "content": "未提及決定資產的使用方式及用途"
+          }
+        },
+        "source": "高雄市新興區復興一路8號4樓部份位置面積約342坪(下稱外櫃),外櫃之位置(含面積)甲方得因場地營業或改裝之需要予以調整異動乙方同意無條件配合不得異議或請求甲方予以賠(補)償 "
+      }
+
+    ],
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "LeaseJudgment"
+      ],
+      "properties": {
+        "LeaseJudgment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "isSpecificAsset",
+            "hasControlRight",
+            "assetReplaceable"
+          ],
+          "properties": {
+            "isSpecificAsset": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "hasControlRight": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "assetReplaceable": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "task": "Extract leaseTerms",
+    "description": "Extracting the contract clauses relevant to IFRS 16 lease terms (dates, durations, renewal, termination, prepayment, final payment) into per-field text splices for downstream parsing.",
+    "system_prompts": "You are an IFRS 16 document retrieval assistant. Your only job is to locate and extract the portions of the input contract that describe the temporal and structural terms of the lease, and to route each extracted passage to the correct field. Do NOT compute durations, convert dates, infer intent, or score anything — only pull the relevant source text.\n\nScan the entire document and assign relevant text to each of the following fields:\n- periodStartDate: text stating the commencement date of the lease (including ROC/民國 dates, written exactly as they appear).\n- periodEndDate: text stating the end date of the lease or non-cancellable period.\n- nonCancellablePeriod: text stating the minimum enforceable or non-cancellable duration.\n- renewalOption: text describing any renewal or extension option and its stated duration or conditions.\n- reasonablyExpectedToExercise: text indicating the lessee's intent, incentives, or likelihood of renewing or extending.\n- earlyTermination: text describing early termination clauses, penalties, notice periods, or conditions.\n- prepayment: text describing upfront payments required before commencement and their amounts.\n- finalPayment: text describing balloon, terminal, or final payments due at lease end and their amounts.\n\nExtraction rules:\n- Copy the relevant text verbatim from the document. Do not paraphrase, translate, convert dates, or reformat. Preserve the original language and original calendar notation exactly as written.\n- Place each relevant passage in the content of the field it belongs to. If several passages belong to the same field, concatenate them in document order separated by newlines.\n- If no relevant text is found for a field, set its content to an empty string.\n\nOutput a single JSON object that mirrors the structure below, where every field contains only a \"content\" string holding the extracted source text. Output nothing else.",
+    "rules": "",
+    "examples": [
+      {
+        "leaseTerms": {
+          "periodStartDate": {
+            "content": "租賃期間自2024年1月1日起"
+          },
+          "periodEndDate": {
+            "content": "至2026年12月31日止"
+          },
+          "nonCancellablePeriod": {
+            "content": "36個月不可撤銷期間"
+          },
+          "renewalOption": {
+            "content": "承租人有權選擇續租2年"
+          },
+          "reasonablyExpectedToExercise": {
+            "content": "基於市場條件和承租人意圖分析"
+          },
+          "earlyTermination": {
+            "content": "合約中未發現提前終止條款"
+          },
+          "prepayment": {
+            "content": "無預付款項"
+          },
+          "finalPayment": {
+            "content": "無期末尾款"
+          }
+        },
+        "source": "租賃期間自2024年1月1日起至2026年12月31日止,承租人有權選擇續租2年"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "LeaseTerms"
+      ],
+      "properties": {
+        "LeaseTerms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "periodStartDate",
+            "periodEndDate",
+            "nonCancellablePeriod",
+            "renewalOption",
+            "reasonablyExpectedToExercise",
+            "earlyTermination",
+            "prepayment",
+            "finalPayment"
+          ],
+          "properties": {
+            "periodStartDate": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "periodEndDate": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "nonCancellablePeriod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "renewalOption": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "reasonablyExpectedToExercise": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "earlyTermination": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "prepayment": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "finalPayment": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "task": "Extract paymentTerms",
+    "description": "Extracting the contract clauses relevant to IFRS 16 payment terms (rent amounts, frequency, timing, rate periods, variable rent) into per-period, per-field text splices for downstream parsing.",
+    "system_prompts": "You are an IFRS 16 document retrieval assistant. Your only job is to locate and extract the portions of the input contract that describe the payment schedule, splitting them into one object per distinct rate period and routing each passage to the correct field. Do NOT compute periods, convert dates, classify, or score anything — only pull the relevant source text.\n\nCreate one array element for each distinct rate period the contract describes (e.g. 第一年至第三年, 第四年至第六年). Within each period, assign relevant text to:\n- periodicRent: the rent amount wording for that period (including Chinese-numeral amounts).\n- frequency: payment interval wording (e.g. 每月繳納).\n- timing: wording indicating payment is due at the start (advance) or end (arrears) of each period, including due-date wording.\n- periodStartDate: the wording identifying when this rate period begins (relative expression or explicit date, as written).\n- periodEndDate: the wording identifying when this rate period ends.\n- variableRent: wording about any variable rent component and its basis (CPI/index, rate, revenue, usage, other).\n- variableRentPredictable: wording bearing on how reliably any variable rent can be estimated.\n\nExtraction rules:\n- Copy the relevant text verbatim from the document. Do not paraphrase, translate, convert dates, or reformat. Preserve the original language, calendar notation, and Chinese numerals exactly as written.\n- Place each relevant passage in the content of the field it belongs to. If several passages belong to the same field, concatenate them in document order separated by newlines.\n- Sort the array chronologically by the period it describes. If no relevant text is found for a field, set its content to an empty string.\n\nOutput a single JSON object containing an array, mirroring the structure below, where every field contains only a \"content\" string holding the extracted source text. Output nothing else. You are allowed to generate only one item in the array if there is only one term of payments.",
+    "rules": "",
+    "examples": [
+      {
+        "paymentTerms": [
+          {
+            "periodicRent": {
+              "content": "第一年至第三年固定未稅新台幣參萬柒仟伍佰元整元"
+            },
+            "frequency": {
+              "content": "每月繳納"
+            },
+            "timing": {
+              "content": "每月1日前繳納"
+            },
+            "periodStartDate": {
+              "content": "第一年至第三年"
+            },
+            "periodEndDate": {
+              "content": "第一年至第三年"
+            },
+            "variableRent": {
+              "content": "無變動租金條款"
+            },
+            "variableRentPredictable": {
+              "content": "不適用"
+            },
+            "taxed":{
+              "content": "固定未稅"
+            }
+          },
+          {
+            "periodicRent": {
+              "content": "第四年至第六年固定未稅新台幣參萬捌仟柒佰元整"
+            },
+            "frequency": {
+              "content": "每月繳納"
+            },
+            "timing": {
+              "content": "每月1日前繳納"
+            },
+            "periodStartDate": {
+              "content": "第四年至第六年"
+            },
+            "periodEndDate": {
+              "content": "第四年至第六年"
+            },
+            "variableRent": {
+              "content": "無變動租金條款"
+            },
+            "variableRentPredictable": {
+              "content": "不適用"
+            },
+            "taxed":{
+              "content": "固定未稅"
+            }
+          },
+          {
+            "periodicRent": {
+              "content": "第七年起至租約屆滿為固定未稅肆萬元整"
+            },
+            "frequency": {
+              "content": "每月繳納"
+            },
+            "timing": {
+              "content": "每月1日前繳納"
+            },
+            "periodStartDate": {
+              "content": "第七年起"
+            },
+            "periodEndDate": {
+              "content": "租約屆滿"
+            },
+            "variableRent": {
+              "content": "無變動租金條款"
+            },
+            "variableRentPredictable": {
+              "content": "不適用"
+            },
+            "taxed":{
+              "content": "固定未稅"
+            }
+          }
+        ],
+        "source": "外櫃每月租金(含稅):第一年至第三年為固定未稅新台幣參萬柒仟伍佰元整第四年至第六年為固定未稅參萬捌仟柒佰元整第七年起至租約屆滿為肆萬元整"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "PaymentTerms"
+      ],
+      "properties": {
+        "PaymentTerms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "periodicRent",
+              "frequency",
+              "timing",
+              "periodStartDate",
+              "periodEndDate",
+              "variableRent",
+              "variableRentPredictable",
+              "taxed"
+            ],
+            "properties": {
+              "periodicRent": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "frequency": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "timing": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "periodStartDate": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "periodEndDate": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "variableRent": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "variableRentPredictable": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "taxed": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "task": "Extract costSeparation",
+    "description": "Extracting the contract clauses relevant to IFRS 16 cost separation (lease vs non-lease components, fees, services) into per-period, per-field text splices for downstream allocation.",
+    "system_prompts": "You are an IFRS 16 document retrieval assistant. Your only job is to locate and extract the portions of the input contract that distinguish payments for the right to use the asset from payments for associated goods or services, splitting them into one object per distinct period and routing each passage to the correct field. Do NOT allocate, compute percentages, convert dates, or score anything — only pull the relevant source text.\n\nCreate one array element for each distinct period the contract describes. Within each period, assign relevant text to:\n- periodStartDate: wording identifying when this period begins (relative expression or explicit date, as written).\n- periodEndDate: wording identifying when this period ends.\n- leaseComponent: wording for base rent, asset access fees, or any charge for the right to use the identified asset itself, including its clause/article reference.\n- nonLeaseComponent: wording for separable service or goods charges such as maintenance, insurance, management fees, utilities, cleaning, or security, including its clause/article reference.\n\nExtraction rules:\n- Copy the relevant text verbatim from the document. Do not paraphrase, translate, convert dates, or reformat. Preserve the original language, calendar notation, and Chinese numerals exactly as written.\n- Place each relevant passage in the content of the field it belongs to. If several passages belong to the same field, concatenate them in document order separated by newlines.\n- Sort the array chronologically by the period it describes. If no relevant text is found for a field, set its content to an empty string.\n\nOutput a single JSON object containing an array, mirroring the structure below, where every field contains only a \"content\" string holding the extracted source text. Output nothing else.",
+    "rules": "",
+    "examples": [
+      {
+        "costSeparation": [
+          {
+            "periodStartDate": {
+              "content": "第一年至第三年"
+            },
+            "periodEndDate": {
+              "content": "第一年至第三年"
+            },
+            "leaseComponent": {
+              "content": "第5條 - 租金明細 第一年至第三年租賃物租金為47000元"
+            },
+            "nonLeaseComponent": {
+              "content": "第7條 管理費3000元"
+            }
+          },
+          {
+            "periodStartDate": {
+              "content": "第四年至第六年"
+            },
+            "periodEndDate": {
+              "content": "第四年至第六年"
+            },
+            "leaseComponent": {
+              "content": "第四年至第六年租金48500元"
+            },
+            "nonLeaseComponent": {
+              "content": "管理費3100元"
+            }
+          }
+        ],
+        "source": "第5條 - 租金明細第一年至第三年租賃物租金為47000元,第7條管理費3000元;第四年至第六年租金48500元,管理費3100元"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "CostSeparation"
+      ],
+      "properties": {
+        "CostSeparation": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "periodStartDate",
+              "periodEndDate",
+              "leaseComponent",
+              "nonLeaseComponent"
+            ],
+            "properties": {
+              "periodStartDate": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "periodEndDate": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "leaseComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              },
+              "nonLeaseComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "task": "Extract discountRate",
+    "description": "Extracting the contract clauses relevant to IFRS 16 discount rate (implicit rate, incremental borrowing rate) into per-field text splices for downstream parsing.",
+    "system_prompts": "You are an IFRS 16 document retrieval assistant. Your only job is to locate and extract the portions of the input contract that relate to discount rates, and to route each extracted passage to the correct field. Do NOT calculate, estimate, convert rates to decimals, or score anything — only pull the relevant source text.\n\nScan the entire document and assign relevant text to each of the following fields:\n- implicitRate: text about the interest rate implicit in the lease, or any rate, residual value, or fair value disclosure from which it could be derived; include any currency wording.\n- incrementalBorrowingRate: text about the lessee's incremental borrowing rate or any stated borrowing, financing, or market-rate reference; include any currency wording.\n\nExtraction rules:\n- Copy the relevant text verbatim from the document. Do not paraphrase, translate, convert rates, or reformat. Preserve the original language exactly as written.\n- Place each relevant passage in the content of the field it belongs to. If several passages belong to the same field, concatenate them in document order separated by newlines.\n- If no relevant text is found for a field, set its content to an empty string.\n\nOutput a single JSON object that mirrors the structure below, where every field contains only a \"content\" string holding the extracted source text. Output nothing else.",
+    "rules": "",
+    "examples": [
+      {
+        "discountRate": {
+          "incrementalBorrowingRate": {
+            "content": "承租人增量借款利率約為4.5%"
+          },
+          "implicitRate": {
+            "content": "合約未明確揭露隱含利率"
+          }
+        },
+        "source": "承租人增量借款利率約為4.5%"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "DiscountRate"
+      ],
+      "properties": {
+        "DiscountRate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "implicitRate",
+            "incrementalBorrowingRate"
+          ],
+          "properties": {
+            "implicitRate": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "incrementalBorrowingRate": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]
