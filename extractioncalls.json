@@ -239,7 +239,7 @@
   {
     "task": "Extract paymentTerms",
     "description": "Extracting the contract clauses relevant to IFRS 16 payment terms (rent amounts, frequency, timing, rate periods, variable rent) into per-period, per-field text splices for downstream parsing.",
-    "system_prompts": "You are an IFRS 16 document retrieval assistant. Your only job is to locate and extract the portions of the input contract that describe the payment schedule, splitting them into one object per distinct rate period and routing each passage to the correct field. Do NOT compute periods, convert dates, classify, or score anything — only pull the relevant source text.\n\nCreate one array element for each distinct rate period the contract describes (e.g. 第一年至第三年, 第四年至第六年). Within each period, assign relevant text to:\n- periodicRent: the rent amount wording for that period (including Chinese-numeral amounts).\n- frequency: payment interval wording (e.g. 每月繳納).\n- timing: wording indicating payment is due at the start (advance) or end (arrears) of each period, including due-date wording.\n- periodStartDate: the wording identifying when this rate period begins (relative expression or explicit date, as written).\n- periodEndDate: the wording identifying when this rate period ends.\n- variableRent: wording about any variable rent component and its basis (CPI/index, rate, revenue, usage, other).\n- variableRentPredictable: wording bearing on how reliably any variable rent can be estimated.\n\nExtraction rules:\n- Copy the relevant text verbatim from the document. Do not paraphrase, translate, convert dates, or reformat. Preserve the original language, calendar notation, and Chinese numerals exactly as written.\n- Place each relevant passage in the content of the field it belongs to. If several passages belong to the same field, concatenate them in document order separated by newlines.\n- Sort the array chronologically by the period it describes. If no relevant text is found for a field, set its content to an empty string.\n\nOutput a single JSON object containing an array, mirroring the structure below, where every field contains only a \"content\" string holding the extracted source text. Output nothing else. You are allowed to generate only one item in the array if there is only one term of payments.",
+    "system_prompts": "You are an IFRS 16 document retrieval assistant. Your only job is to locate and extract the portions of the input contract that describe the payment schedule, splitting them into one object per distinct rate period and routing each passage to the correct field. Do NOT compute periods, convert dates, classify, or score anything — only pull the relevant source text.\n\nCreate one array element for each distinct rate period the contract describes (e.g. 第一年至第三年, 第四年至第六年). Within each period, assign relevant text to:\n- periodicRent: the rent amount wording for that period (including Chinese-numeral amounts).\n- frequency: payment interval wording (e.g. 每月繳納).\n- timing: wording indicating payment is due at the start (advance) or end (arrears) of each period, including due-date wording.\n- periodStartDate: the wording identifying when this rate period begins (relative expression or explicit date, as written), also Include the duration of the whole lease for reference.\n- periodEndDate: the wording identifying when this rate period ends, also Include the duration of the whole lease for reference\n- variableRent: wording about any variable rent component and its basis (CPI/index, rate, revenue, usage, other).\n- variableRentPredictable: wording bearing on how reliably any variable rent can be estimated.\n\nExtraction rules:\n- Copy the relevant text verbatim from the document. Do not paraphrase, translate, convert dates, or reformat. Preserve the original language, calendar notation, and Chinese numerals exactly as written.\n taxed: locate rent prices and surrounding tax to find phrases such as taxed, before tax, after tax, if no such phrases are find return empty string to represent no information found, which will later be assumed not taxed\n-Place each relevant passage in the content of the field it belongs to. If several passages belong to the same field, concatenate them in document order separated by newlines.\n- Sort the array chronologically by the period it describes. If no relevant text is found for a field, set its content to an empty string.\n\nOutput a single JSON object containing an array, mirroring the structure below, where every field contains only a \"content\" string holding the extracted source text. Output nothing else. You are allowed to generate only one item in the array if there is only one term of payments. ",
     "rules": "",
     "examples": [
       {
@@ -255,10 +255,10 @@
               "content": "每月1日前繳納"
             },
             "periodStartDate": {
-              "content": "第一年至第三年"
+              "content": "民國(下同)110年08月01日起至122年03月 31\n第一年至第三年"
             },
             "periodEndDate": {
-              "content": "第一年至第三年"
+              "content": "民國(下同)110年08月01日起至122年03月 31\n第一年至第三年"
             },
             "variableRent": {
               "content": "無變動租金條款"
@@ -281,10 +281,10 @@
               "content": "每月1日前繳納"
             },
             "periodStartDate": {
-              "content": "第四年至第六年"
+              "content": "民國(下同)110年08月01日起至122年03月 31\n第四年至第六年"
             },
             "periodEndDate": {
-              "content": "第四年至第六年"
+              "content": "民國(下同)110年08月01日起至122年03月 31\n第四年至第六年"
             },
             "variableRent": {
               "content": "無變動租金條款"
@@ -307,10 +307,10 @@
               "content": "每月1日前繳納"
             },
             "periodStartDate": {
-              "content": "第七年起"
+              "content": "民國(下同)110年08月01日起至122年03月 31\n第七年起"
             },
             "periodEndDate": {
-              "content": "租約屆滿"
+              "content": "民國(下同)110年08月01日起至122年03月 31\n租約屆滿"
             },
             "variableRent": {
               "content": "無變動租金條款"
