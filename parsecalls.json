@@ -165,7 +165,7 @@
   {
     "task": "Parse leaseTerms Info",
     "description": "Evaluating leaseTerms from pre-extracted content splices using given ifrs16 rules",
-    "system_prompts": "You are an IFRS 16 lease terms extraction specialist. You receive a JSON object whose LeaseTerms property contains one field per term (periodStartDate, periodEndDate, nonCancellablePeriod, renewalOption, reasonablyExpectedToExercise, earlyTermination, prepayment, finalPayment), each holding a content string of pre-extracted, verbatim contract text relevant to that term. Base your analysis solely on these provided content splices; do not expect the full contract. Parse each field from its matching content splice with precision.\n\nExtract each of the following fields:\n- periodStartDate: The commencement date of the lease (ISO 8601 format).\n- periodEndDate: The end date of the non-cancellable period (ISO 8601 format).\n- nonCancellablePeriod: The minimum enforceable duration in months as an integer.\n- renewalOption: Whether a renewal option exists, and the duration in months if so.\n- reasonablyExpectedToExercise: Based on economic incentives, market conditions, and stated lessee intent, assess whether the renewal option is reasonably certain to be exercised.\n- earlyTermination: Whether an early termination clause exists. If yes, extract any penalty amount and classify penalty type as \"percentage\", \"fixed\", or \"other\".\n- prepayment: Whether any upfront payment is required before the lease commencement, and its amount.\n- finalPayment: Whether a balloon or terminal payment is due at lease end, and its amount.\n\nOutput rules:\n- Set value/hasOption/hasClause/hasPrepayment/hasPayment to null if that field's content splice is empty or silent — do not assume absence means false.\n- Copy the relevant text from that field's content splice verbatim or near-verbatim into content.\n- Score confidence 0–100 reflecting textual clarity; reduce confidence when inference is required.\n- All dates must be ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ).\n- Dates may be written in the Republic of China (ROC/民國) calendar. Convert to Gregorian using: Gregorian year = ROC year + 1911. Examples: 民國113年3月15日 → 113+1911=2024 → 2024-03-15T00:00:00.000Z; 民國114年1月1日 → 114+1911=2025 → 2025-01-01T00:00:00.000Z; 民國112年12月31日 → 112+1911=2023 → 2023-12-31T00:00:00.000Z. Do NOT interpret ROC years as 2-digit Gregorian years (民國113年 is NOT 2013 and NOT 2113). If the year is already written in 4-digit Gregorian format (e.g. 2024年), do NOT add 1911. Always compute the arithmetic explicitly before writing the final ISO date.\n\nDate verification (chain-of-thought, mandatory):\nBefore writing any date value, you must reason through it step by step in this order:\n  Step 1 — Identify the lease commencement date (periodStartDate) first. This is your anchor. Convert it to Gregorian if needed, showing the arithmetic.\n  Step 2 — For periodEndDate: if the contract states a nonCancellablePeriod in months, verify by computing anchor date + N months and confirm it matches any explicit end date in the contract. If they conflict, trust the arithmetic over the literal text and flag the discrepancy in content.\n  Step 3 — Cross-check: confirm that (periodEndDate year) − (periodStartDate year) is consistent with nonCancellablePeriod ÷ 12. If not, recheck your ROC conversion.",
+    "system_prompts": "You are an IFRS 16 lease terms extraction specialist. You receive a JSON object whose LeaseTerms property contains one field per term (periodStartDate, periodEndDate, nonCancellablePeriod, renewalOption, reasonablyExpectedToExercise, earlyTermination, prepayment, finalPayment), each holding a content string of pre-extracted, verbatim contract text relevant to that term. Base your analysis solely on these provided content splices; do not expect the full contract. Parse each field from its matching content splice with precision.\n\nExtract each of the following fields:\n- periodStartDate: The commencement date of the lease (ISO 8601 format).\n- periodEndDate: The end date of the non-cancellable period (ISO 8601 format).\n- nonCancellablePeriod: The minimum enforceable duration in months as an integer.\n- renewalOption: Whether a renewal option exists, and the duration in months if so.\n- reasonablyExpectedToExercise: Based on economic incentives, market conditions, and stated lessee intent, assess whether the renewal option is reasonably certain to be exercised.\n- earlyTermination: Whether an early termination clause exists. If yes, extract any penalty amount and classify penalty type as \"percentage\", \"fixed\", or \"other\".\n- prepayment: Whether any upfront payment is required before the lease commencement, and its amount.\n- finalPayment: Whether a balloon or terminal payment is due at lease end, and its amount.\n\nOutput rules:\n- Set value/hasOption/hasClause/hasPrepayment/hasPayment to null if that field's content splice is empty or silent — do not assume absence means false.\n- Copy the relevant text from that field's content splice verbatim or near-verbatim into content.\n- Score confidence 0–100 reflecting textual clarity; reduce confidence when inference is required.\n- All dates must be ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ).\n- Dates may be written in the Republic of China (ROC/民國) calendar. Convert to Gregorian using: Gregorian year = ROC year + 1911. Examples: 民國113年3月15日 → 113+1911=2024 → 2024-03-15T00:00:00.000Z; 民國114年1月1日 → 114+1911=2025 → 2025-01-01T00:00:00.000Z; 民國112年12月31日 → 112+1911=2023 → 2023-12-31T00:00:00.000Z,  民國122年03月31日 → 112+1911=2033 → 2023-03-31T00:00:00.000Z. Do NOT interpret ROC years as 2-digit Gregorian years (民國113年 is NOT 2013 and NOT 2113, it is 2024(1911 + 113)). If the year is already written in 4-digit Gregorian format (e.g. 2024年), do NOT add 1911. Always compute the arithmetic explicitly before writing the final ISO date.\n\nDate verification (chain-of-thought, mandatory):\nBefore writing any date value, you must reason through it step by step in this order:\n  Step 1 — Identify the lease commencement date (periodStartDate) first. This is your anchor. Convert it to Gregorian if needed, showing the arithmetic.\n  Step 2 — For periodEndDate: if the contract states a nonCancellablePeriod in months, verify by computing anchor date + N months and confirm it matches any explicit end date in the contract. If they conflict, trust the arithmetic over the literal text and flag the discrepancy in content.\n  Step 3 — Cross-check: confirm that (periodEndDate year) − (periodStartDate year) is consistent with nonCancellablePeriod ÷ 12. If not, recheck your ROC conversion.",
     "rules": "",
     "examples": [
       {
@@ -550,164 +550,164 @@
   {
     "task": "Parse paymentTerms Info",
     "description": "Evaluating paymentTerms from pre-extracted content splices using given ifrs16 rules",
-    "system_prompts": "You are an IFRS 16 payment schedule extraction specialist. You receive a JSON object whose PaymentTerms property is an array of pre-extracted rate-period objects, each field (periodicRent, frequency, timing, periodStartDate, periodEndDate, variableRent, variableRentPredictable) holding a content string of verbatim contract text relevant to that field for that period. Base your analysis solely on these provided content splices; do not expect the full contract. Parse every distinct payment period as a chronologically ordered list, using the matching content splice for each field.\n\nFor each payment period, extract:\n- periodicRent: The fixed rent amount for that period (numeric, in contract currency).\n- frequency: Payment interval — one of: \"monthly\", \"quarterly\", \"semi-annual\", \"annual\".\n- timing: Whether payment is due at the start (\"advance\") or end (\"arrears\") of each period.\n- periodStartDate / periodEndDate: The calendar start and end of this rate period (ISO 8601).\n- variableRent: Whether rent in this period contains a variable component. If yes, classify type as \"cpi\", \"rate\", \"revenue\", or \"other\".\n- variableRentPredictable: If variable rent exists, assess whether it can be reliably estimated at commencement (e.g. CPI-linked with known index = predictable; usage-based = not predictable). Set isPredictable to null if variableRent.hasVariable is false.\n\nOutput rules:\n- Create one object per distinct rate period, even if frequency and timing are identical.\n- Sort the list chronologically by periodStartDate ascending.\n- If a field cannot be determined from its content splice, set its value/amount/type to null and explain briefly in content or reason.\n- Confidence reflects textual certainty per field, scored 0–100.\n- Dates may be written in the Republic of China (ROC/民國) calendar. Convert to Gregorian using: Gregorian year = ROC year + 1911. Examples: 民國113年3月15日 → 113+1911=2024 → 2024-03-15T00:00:00.000Z; 民國114年1月1日 → 114+1911=2025 → 2025-01-01T00:00:00.000Z; 民國112年12月31日 → 112+1911=2023 → 2023-12-31T00:00:00.000Z. Do NOT interpret ROC years as 2-digit Gregorian years (民國113年 is NOT 2013 and NOT 2113). If the year is already written in 4-digit Gregorian format (e.g. 2024年), do NOT add 1911. Always compute the arithmetic explicitly before writing the final ISO date.\n\nDate verification (chain-of-thought, mandatory):\nBefore writing any periodStartDate or periodEndDate, reason through it step by step:\n  Step 1 — Identify the lease commencement date from the provided content splices (typically the earliest periodStartDate splice). This is your anchor. Convert it to Gregorian if needed, showing the ROC arithmetic explicitly (e.g. 民國113年 → 113+1911=2024).\n  Step 2 — For relative period expressions (e.g. 第一年至第三年, 第四年至第六年), derive dates by adding years to the anchor. Do NOT read a year number from the contract text for these — compute it.\n    Example: anchor = 2024-01-01, 第一年至第三年 → periodStartDate = 2024-01-01, periodEndDate = 2024-01-01 + 3 years − 1 day = 2026-12-31.\n    Example: anchor = 2024-01-01, 第四年至第六年 → periodStartDate = 2024-01-01 + 3 years = 2027-01-01, periodEndDate = 2024-01-01 + 6 years − 1 day = 2029-12-31.\n  Step 3 — Verify the periods are contiguous: periodStartDate of period N+1 must be exactly one day after periodEndDate of period N. If not, recheck.\n  Step 4 — Verify the final periodEndDate matches the lease end date from leaseTerms. If they conflict, flag it in content.",
+    "system_prompts": "You are an IFRS 16 payment schedule extraction specialist. You receive a JSON object whose PaymentTerms property is an array of pre-extracted rate-period objects, each field (periodicRent, frequency, timing, periodStartDate, periodEndDate, variableRent, variableRentPredictable) holding a content string of verbatim contract text relevant to that field for that period. Base your analysis solely on these provided content splices; do not expect the full contract. Parse every distinct payment period as a chronologically ordered list, using the matching content splice for each field.\n\nFor each payment period, extract:\n- periodicRent: The fixed rent amount for that period (numeric, in contract currency).\n- frequency: Payment interval — one of: \"monthly\", \"quarterly\", \"semi-annual\", \"annual\".\n- timing: Whether payment is due at the start (\"advance\") or end (\"arrears\") of each period. If payment date sentimently indicates it is arrears or advance, keep it this way. If the payment date happens before(inclusive) the 16th of each month, it is advance payment, if it happends after it is arrears payment, for example October 25 Start Date\n- periodStartDate / periodEndDate: The calendar start and end of this rate period (ISO 8601).\n- variableRent: Whether rent in this period contains a variable component. If yes, classify type as \"cpi\", \"rate\", \"revenue\", or \"other\".\n- variableRentPredictable: If variable rent exists, assess whether it can be reliably estimated at commencement (e.g. CPI-linked with known index = predictable; usage-based = not predictable). Set isPredictable to null if variableRent.hasVariable is false.\n\nOutput rules:\n- Create one object per distinct rate period, even if frequency and timing are identical.\n- Sort the list chronologically by periodStartDate ascending.\n- If a field cannot be determined from its content splice, set its value/amount/type to null and explain briefly in content or reason.\n- Confidence reflects textual certainty per field, scored 0–100.\n- Dates may be written in the Republic of China (ROC/民國) calendar. Convert to Gregorian using: Gregorian year = ROC year + 1911. Examples: 民國113年3月15日 → 113+1911=2024 → 2024-03-15T00:00:00.000Z; 民國114年1月1日 → 114+1911=2025 → 2025-01-01T00:00:00.000Z; 民國112年12月31日 → 112+1911=2023 → 2023-12-31T00:00:00.000Z. Do NOT interpret ROC years as 2-digit Gregorian years (民國113年 is NOT 2013 and NOT 2113). If the year is already written in 4-digit Gregorian format (e.g. 2024年), do NOT add 1911. Always compute the arithmetic explicitly before writing the final ISO date.\n\nDate verification (chain-of-thought, mandatory):\nBefore writing any periodStartDate or periodEndDate, reason through it step by step:\n  Step 1 — Identify the lease commencement date from the provided content splices (typically the earliest periodStartDate splice). This is your anchor. Convert it to Gregorian if needed, showing the ROC arithmetic explicitly (e.g. 民國113年 → 113+1911=2024).\n  Step 2 — For relative period expressions (e.g. 第一年至第三年, 第四年至第六年), derive dates by adding years to the anchor. Do NOT read a year number from the contract text for these — compute it.\n    Example: anchor = 2024-01-01, 第一年至第三年 → periodStartDate = 2024-01-01, periodEndDate = 2024-01-01 + 3 years − 1 day = 2026-12-31.\n    Example: anchor = 2024-01-01, 第四年至第六年 → periodStartDate = 2024-01-01 + 3 years = 2027-01-01, periodEndDate = 2024-01-01 + 6 years − 1 day = 2029-12-31.\n  Step 3 — Verify the periods are contiguous: periodStartDate of period N+1 must be exactly one day after periodEndDate of period N. If not, recheck.\n  Step 4 — Verify the final periodEndDate matches the lease end date from leaseTerms. If they conflict, flag it in content.",
     "rules": "",
     "examples": [
       {
         "paymentTerms": [
-          {
-            "periodicRent": {
-              "amount": 37500,
-              "content": "第一年至第三年固定未稅新台幣參萬柒仟伍佰元整元",
-              "confidence": 95,
-              "userConfirmed": false
+            {
+                "periodicRent": {
+                    "amount": 37500,
+                    "content": "第一年至第三年固定未稅新台幣參萬柒仟伍佰元整元",
+                    "confidence": 95,
+                    "userConfirmed": false
+                },
+                "frequency": {
+                    "value": "monthly",
+                    "content": "每月繳納",
+                    "confidence": 90,
+                    "userConfirmed": false
+                },
+                "timing": {
+                    "value": "advance",
+                    "content": "每月1日前繳納",
+                    "confidence": 90,
+                    "userConfirmed": false
+                },
+                "periodStartDate": {
+                    "value": "2021-08-01T00:00:00.000Z",
+                    "content": "民國(下同)110年08月01日起至122年03月 31\n第一年至第三年",
+                    "confidence": 95,
+                    "userConfirmed": false
+                },
+                "periodEndDate": {
+                    "value": "2024-07-31T00:00:00.000Z",
+                    "content": "民國(下同)110年08月01日起至122年03月 31\n第一年至第三年",
+                    "confidence": 95,
+                    "userConfirmed": false
+                },
+                "variableRent": {
+                    "hasVariable": false,
+                    "type": null,
+                    "content": "無變動租金條款",
+                    "confidence": 85,
+                    "userConfirmed": false
+                },
+                "variableRentPredictable": {
+                    "isPredictable": null,
+                    "content": "不適用",
+                    "confidence": 0,
+                    "userConfirmed": false
+                },
+                "taxed": {
+                    "isTaxed": false,
+                    "content": "固定未稅",
+                    "confidence": 100,
+                    "userConfirmed": false
+                }
             },
-            "frequency": {
-              "value": "monthly",
-              "content": "每月繳納",
-              "confidence": 90,
-              "userConfirmed": false
+            {
+                "periodicRent": {
+                    "amount": 38700,
+                    "content": "第四年至第六年固定未稅新台幣參萬捌仟柒佰元整",
+                    "confidence": 95,
+                    "userConfirmed": false
+                },
+                "frequency": {
+                    "value": "monthly",
+                    "content": "每月繳納",
+                    "confidence": 90,
+                    "userConfirmed": false
+                },
+                "timing": {
+                    "value": "advance",
+                    "content": "每月1日前繳納",
+                    "confidence": 90,
+                    "userConfirmed": false
+                },
+                "periodStartDate": {
+                    "value": "2024-08-01T00:00:00.000Z",
+                    "content": "民國(下同)110年08月01日起至122年03月 31\n第四年至第六年",
+                    "confidence": 95,
+                    "userConfirmed": false
+                },
+                "periodEndDate": {
+                    "value": "2027-07-30T00:00:00.000Z",
+                    "content": "民國(下同)110年08月01日起至122年03月 31\n第四年至第六年",
+                    "confidence": 95,
+                    "userConfirmed": false
+                },
+                "variableRent": {
+                    "hasVariable": false,
+                    "type": null,
+                    "content": "無變動租金條款",
+                    "confidence": 85,
+                    "userConfirmed": false
+                },
+                "variableRentPredictable": {
+                    "isPredictable": null,
+                    "content": "不適用",
+                    "confidence": 0,
+                    "userConfirmed": false
+                },
+                "taxed": {
+                    "isTaxed": false,
+                    "content": "固定未稅",
+                    "confidence": 100,
+                    "userConfirmed": false
+                }
             },
-            "timing": {
-              "value": "advance",
-              "content": "每月1日前繳納",
-              "confidence": 90,
-              "userConfirmed": false
-            },
-            "periodStartDate": {
-              "value": "2024-01-01T00:00:00.000Z",
-              "content": "第一年至第三年",
-              "confidence": 95,
-              "userConfirmed": false
-            },
-            "periodEndDate": {
-              "value": "2026-12-31T00:00:00.000Z",
-              "content": "第一年至第三年",
-              "confidence": 95,
-              "userConfirmed": false
-            },
-            "variableRent": {
-              "hasVariable": false,
-              "type": null,
-              "content": "無變動租金條款",
-              "confidence": 85,
-              "userConfirmed": false
-            },
-            "variableRentPredictable": {
-              "isPredictable": null,
-              "content": "不適用",
-              "confidence": 0,
-              "userConfirmed": false
-            },
-            "taxed":{
-              "isTaxed": false,
-              "content": "固定未稅",
-              "confidence": 100,
-              "userConfirmed": false
+            {
+                "periodicRent": {
+                    "amount": 40000,
+                    "content": "第七年起至租約屆滿為固定未稅肆萬元整",
+                    "confidence": 95,
+                    "userConfirmed": false
+                },
+                "frequency": {
+                    "value": "monthly",
+                    "content": "每月繳納",
+                    "confidence": 90,
+                    "userConfirmed": false
+                },
+                "timing": {
+                    "value": "advance",
+                    "content": "每月1日前繳納",
+                    "confidence": 90,
+                    "userConfirmed": false
+                },
+                "periodStartDate": {
+                    "value": "2027-08-01T00:00:00.000Z",
+                    "content": "民國(下同)110年08月01日起至122年03月 31\n第七年起",
+                    "confidence": 95,
+                    "userConfirmed": false
+                },
+                "periodEndDate": {
+                    "value": "2033-03-31T00:00:00.000Z",
+                    "content": "民國(下同)110年08月01日起至122年03月 31\n租約屆滿",
+                    "confidence": 95,
+                    "userConfirmed": false
+                },
+                "variableRent": {
+                    "hasVariable": false,
+                    "type": null,
+                    "content": "無變動租金條款",
+                    "confidence": 85,
+                    "userConfirmed": false
+                },
+                "variableRentPredictable": {
+                    "isPredictable": null,
+                    "content": "不適用",
+                    "confidence": 0,
+                    "userConfirmed": false
+                },
+                "taxed": {
+                    "isTaxed": false,
+                    "content": "固定未稅",
+                    "confidence": 100,
+                    "userConfirmed": false
+                }
             }
-          },
-          {
-            "periodicRent": {
-              "amount": 38700,
-              "content": "第四年至第六年固定未稅新台幣參萬捌仟柒佰元整",
-              "confidence": 95,
-              "userConfirmed": false
-            },
-            "frequency": {
-              "value": "monthly",
-              "content": "每月繳納",
-              "confidence": 90,
-              "userConfirmed": false
-            },
-            "timing": {
-              "value": "advance",
-              "content": "每月1日前繳納",
-              "confidence": 90,
-              "userConfirmed": false
-            },
-            "periodStartDate": {
-              "value": "2027-01-01T00:00:00.000Z",
-              "content": "第四年至第六年",
-              "confidence": 95,
-              "userConfirmed": false
-            },
-            "periodEndDate": {
-              "value": "2029-12-31T00:00:00.000Z",
-              "content": "第四年至第六年",
-              "confidence": 95,
-              "userConfirmed": false
-            },
-            "variableRent": {
-              "hasVariable": false,
-              "type": null,
-              "content": "無變動租金條款",
-              "confidence": 85,
-              "userConfirmed": false
-            },
-            "variableRentPredictable": {
-              "isPredictable": null,
-              "content": "不適用",
-              "confidence": 0,
-              "userConfirmed": false
-            },
-            "taxed":{
-              "isTaxed": false,
-              "content": "固定未稅",
-              "confidence": 100,
-              "userConfirmed": false
-            }
-          },
-          {
-            "periodicRent": {
-              "amount": 40000,
-              "content": "第七年起至租約屆滿為固定未稅肆萬元整",
-              "confidence": 95,
-              "userConfirmed": false
-            },
-            "frequency": {
-              "value": "monthly",
-              "content": "每月繳納",
-              "confidence": 90,
-              "userConfirmed": false
-            },
-            "timing": {
-              "value": "advance",
-              "content": "每月1日前繳納",
-              "confidence": 90,
-              "userConfirmed": false
-            },
-            "periodStartDate": {
-              "value": "2030-01-01T00:00:00.000Z",
-              "content": "第七年起至租約屆滿",
-              "confidence": 95,
-              "userConfirmed": false
-            },
-            "periodEndDate": {
-              "value": null,
-              "content": "租約屆滿",
-              "confidence": 95,
-              "userConfirmed": false
-            },
-            "variableRent": {
-              "hasVariable": false,
-              "type": null,
-              "content": "無變動租金條款",
-              "confidence": 85,
-              "userConfirmed": false
-            },
-            "variableRentPredictable": {
-              "isPredictable": null,
-              "content": "不適用",
-              "confidence": 0,
-              "userConfirmed": false
-            },
-            "taxed":{
-              "isTaxed": false,
-              "content": "固定未稅",
-              "confidence": 100,
-              "userConfirmed": false
-            }
-          }
         ],
         "source": {
           "paymentTerms": [
@@ -722,10 +722,10 @@
                 "content": "每月1日前繳納"
               },
               "periodStartDate": {
-                "content": "第一年至第三年"
+                "content": "民國(下同)110年08月01日起至122年03月 31\n第一年至第三年"
               },
               "periodEndDate": {
-                "content": "第一年至第三年"
+                "content": "民國(下同)110年08月01日起至122年03月 31\n第一年至第三年"
               },
               "variableRent": {
                 "content": "無變動租金條款"
@@ -748,10 +748,10 @@
                 "content": "每月1日前繳納"
               },
               "periodStartDate": {
-                "content": "第四年至第六年"
+                "content": "民國(下同)110年08月01日起至122年03月 31\n第四年至第六年"
               },
               "periodEndDate": {
-                "content": "第四年至第六年"
+                "content": "民國(下同)110年08月01日起至122年03月 31\n第四年至第六年"
               },
               "variableRent": {
                 "content": "無變動租金條款"
@@ -774,10 +774,10 @@
                 "content": "每月1日前繳納"
               },
               "periodStartDate": {
-                "content": "第七年起"
+                "content": "民國(下同)110年08月01日起至122年03月 31\n第七年起"
               },
               "periodEndDate": {
-                "content": "租約屆滿"
+                "content": "民國(下同)110年08月01日起至122年03月 31\n租約屆滿"
               },
               "variableRent": {
                 "content": "無變動租金條款"

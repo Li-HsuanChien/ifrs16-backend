@@ -36,7 +36,7 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
-from llmapi import LLMClient, extraction
+from utils.llmapi import LLMClient, extraction
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -240,9 +240,9 @@ def run_task(
 
         # Step 2 — parse/evaluate from the extracted splices
         parse_input = json.dumps(extracted, ensure_ascii=False)
-        with open("verifi.txt", "a", encoding="utf-8") as file:
-            file.write(",\n")
-            file.write(parse_input)
+        # with open("verifi.txt", "a", encoding="utf-8") as file:
+        #     file.write(",\n")
+        #     file.write(parse_input)
         payload = _invoke_with_retry(
             client, parse_entry, parse_input, max_retries, backoff_base
         )

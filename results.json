@@ -1,0 +1,456 @@
+{
+  "Parse discountRate Info": {
+    "task": "Parse discountRate Info",
+    "status": "ok",
+    "payload": {
+      "DiscountRate": {
+        "implicitRate": {
+          "confidence": 0,
+          "currency": "TWD",
+          "rate": null,
+          "content": "Not disclosed in contract",
+          "userConfirmed": false
+        },
+        "incrementalBorrowingRate": {
+          "confidence": 0,
+          "currency": "TWD",
+          "rate": null,
+          "content": "Not disclosed in contract",
+          "userConfirmed": false
+        }
+      }
+    },
+    "elapsed": 5.047000000002299
+  },
+  "Parse leaseTerms Info": {
+    "task": "Parse leaseTerms Info",
+    "status": "ok",
+    "payload": {
+      "LeaseTerms": {
+        "periodStartDate": {
+          "confidence": 95,
+          "content": "外櫃租賃期間自民國(下同)110年08月01日起",
+          "userConfirmed": false,
+          "value": "2021-08-01T00:00:00.000Z"
+        },
+        "periodEndDate": {
+          "confidence": 90,
+          "content": "至122年03月31日止",
+          "userConfirmed": false,
+          "value": "2033-03-31T00:00:00.000Z"
+        },
+        "nonCancellablePeriod": {
+          "confidence": 0,
+          "content": "",
+          "userConfirmed": false,
+          "value": null
+        },
+        "renewalOption": {
+          "confidence": 70,
+          "content": "甲乙雙方同意,在租賃期滿前二個月,雙方得重新協商本契約之條件",
+          "hasOption": null,
+          "period": null,
+          "userConfirmed": false
+        },
+        "reasonablyExpectedToExercise": {
+          "confidence": 0,
+          "content": "",
+          "userConfirmed": false,
+          "value": null
+        },
+        "earlyTermination": {
+          "confidence": 90,
+          "content": "如於期滿前二個月協議不成,甲方得主張提前終止本契約。\n一、租賃期間內,如甲方未繼續向場地所有權人承租、場地所有權人不准外櫃出租、違反政府法令或因甲方場地改裝、調整、異動或甲方營業、業務上需要等因素,甲方得於一個月前通知乙方提前終止本契約。甲方已收之租金,則按遷出時間計算,將溢收之租金及押金無息返還乙方。\n二、租賃期間內,外櫃如因不可抗力之天災、地變毀損、滅失,乙方無法持續營運時,乙方得據以提前終止本契約。甲方已收之租金,則按遷出時間計算,將押金及溢收之租金及無息返還乙方。\n三、除前項約定外,若乙方因故需提前終止本契約時,至遲應於一個月前以書面通知甲方,乙方同意甲方得不予返還押金作為提前終止之懲罰性違約金。",
+          "hasClause": true,
+          "penalty": 300000,
+          "penaltyType": "fixed",
+          "userConfirmed": false
+        },
+        "prepayment": {
+          "amount": 300000,
+          "confidence": 90,
+          "content": "乙方應於本契約簽訂時,依前開金額開立一年份共十二張支票予甲方,到期日為每月1日,供甲方按月兌現，該支票如未按時兌現,甲方得終止本契約。\n押金參拾萬柒仟捌佰元整,乙方應於本契約簽訂時交付予甲方，甲方於收受押金後應依法逐年設算押金利息並開立三聯式含稅發票交付乙方收執。",
+          "hasPrepayment": true,
+          "userConfirmed": false
+        },
+        "finalPayment": {
+          "amount": null,
+          "confidence": 0,
+          "content": "",
+          "hasPayment": null,
+          "userConfirmed": false
+        }
+      }
+    },
+    "elapsed": 23.70300000000134
+  },
+  "Parse costSeparation Info": {
+    "task": "Parse costSeparation Info",
+    "status": "ok",
+    "payload": {
+      "CostSeparation": [
+        {
+          "periodStartDate": {
+            "value": "2024-01-01T00:00:00.000Z",
+            "content": "第一年至第三年",
+            "confidence": 90,
+            "userConfirmed": false
+          },
+          "periodEndDate": {
+            "value": "2026-12-31T00:00:00.000Z",
+            "content": "第一年至第三年",
+            "confidence": 90,
+            "userConfirmed": false
+          },
+          "leaseComponent": {
+            "amount": 153900,
+            "percentage": 100,
+            "allocationMethod": "cost allocated fully to lease component as no separate non-lease pricing specified",
+            "contractReference": "第三條:租金、押金及給付方式",
+            "confidence": 85,
+            "userConfirmed": false
+          },
+          "nonLeaseComponent": {
+            "amount": 0,
+            "percentage": 0,
+            "allocationMethod": "no separate non-lease component pricing specified; costs borne by lessee per 第四條:費用負擔",
+            "contractReference": "第四條:費用負擔",
+            "confidence": 80,
+            "userConfirmed": false
+          }
+        },
+        {
+          "periodStartDate": {
+            "value": "2027-01-01T00:00:00.000Z",
+            "content": "第四年至第六年",
+            "confidence": 90,
+            "userConfirmed": false
+          },
+          "periodEndDate": {
+            "value": "2029-12-31T00:00:00.000Z",
+            "content": "第四年至第六年",
+            "confidence": 90,
+            "userConfirmed": false
+          },
+          "leaseComponent": {
+            "amount": 158517,
+            "percentage": 100,
+            "allocationMethod": "cost allocated fully to lease component as no separate non-lease pricing specified",
+            "contractReference": "第三條:租金、押金及給付方式",
+            "confidence": 85,
+            "userConfirmed": false
+          },
+          "nonLeaseComponent": {
+            "amount": 0,
+            "percentage": 0,
+            "allocationMethod": "no separate non-lease component pricing specified; costs borne by lessee per 第四條:費用負擔",
+            "contractReference": "第四條:費用負擔",
+            "confidence": 80,
+            "userConfirmed": false
+          }
+        },
+        {
+          "periodStartDate": {
+            "value": "2030-01-01T00:00:00.000Z",
+            "content": "第七年至第九年",
+            "confidence": 90,
+            "userConfirmed": false
+          },
+          "periodEndDate": {
+            "value": "2032-12-31T00:00:00.000Z",
+            "content": "第七年至第九年",
+            "confidence": 90,
+            "userConfirmed": false
+          },
+          "leaseComponent": {
+            "amount": 163273,
+            "percentage": 100,
+            "allocationMethod": "cost allocated fully to lease component as no separate non-lease pricing specified",
+            "contractReference": "第三條:租金、押金及給付方式",
+            "confidence": 85,
+            "userConfirmed": false
+          },
+          "nonLeaseComponent": {
+            "amount": 0,
+            "percentage": 0,
+            "allocationMethod": "no separate non-lease component pricing specified; costs borne by lessee per 第四條:費用負擔",
+            "contractReference": "第四條:費用負擔",
+            "confidence": 80,
+            "userConfirmed": false
+          }
+        },
+        {
+          "periodStartDate": {
+            "value": "2033-01-01T00:00:00.000Z",
+            "content": "第十年起",
+            "confidence": 90,
+            "userConfirmed": false
+          },
+          "periodEndDate": {
+            "value": null,
+            "content": "第十年起",
+            "confidence": 90,
+            "userConfirmed": false
+          },
+          "leaseComponent": {
+            "amount": 168171,
+            "percentage": 100,
+            "allocationMethod": "cost allocated fully to lease component as no separate non-lease pricing specified",
+            "contractReference": "第三條:租金、押金及給付方式",
+            "confidence": 85,
+            "userConfirmed": false
+          },
+          "nonLeaseComponent": {
+            "amount": 0,
+            "percentage": 0,
+            "allocationMethod": "no separate non-lease component pricing specified; costs borne by lessee per 第四條:費用負擔",
+            "contractReference": "第四條:費用負擔",
+            "confidence": 80,
+            "userConfirmed": false
+          }
+        }
+      ]
+    },
+    "elapsed": 37.20300000000134
+  },
+  "Parse paymentTerms Info": {
+    "task": "Parse paymentTerms Info",
+    "status": "ok",
+    "payload": {
+      "PaymentTerms": [
+        {
+          "frequency": {
+            "confidence": 90,
+            "content": "每月",
+            "userConfirmed": false,
+            "value": "monthly"
+          },
+          "periodicRent": {
+            "amount": 153900,
+            "confidence": 95,
+            "content": "第一年至第三年為新台幣(下同)壹拾伍萬參仟玖佰元整",
+            "userConfirmed": false
+          },
+          "timing": {
+            "confidence": 90,
+            "content": "乙方應於本契約簽訂時,依前開金額開立一年份共十二張支票予甲方,到期日為每月1日,供甲方按月兌現",
+            "userConfirmed": false,
+            "value": "advance"
+          },
+          "variableRent": {
+            "confidence": 0,
+            "content": "",
+            "hasVariable": false,
+            "type": null,
+            "userConfirmed": false
+          },
+          "variableRentPredictable": {
+            "confidence": 0,
+            "isPredictable": null,
+            "content": "",
+            "userConfirmed": false
+          },
+          "periodStartDate": {
+            "value": "2021-08-01T00:00:00.000Z",
+            "confidence": 95,
+            "content": "外櫃租賃期間自民國(下同)110年08月01日起至122年03月31日止\n第一年至第三年",
+            "userConfirmed": false
+          },
+          "periodEndDate": {
+            "value": "2024-07-31T00:00:00.000Z",
+            "confidence": 95,
+            "content": "外櫃租賃期間自民國(下同)110年08月01日起至122年03月31日止\n第一年至第三年",
+            "userConfirmed": false
+          },
+          "taxed": {
+            "confidence": 100,
+            "isTaxed": true,
+            "content": "含稅",
+            "userConfirmed": false
+          }
+        },
+        {
+          "frequency": {
+            "confidence": 90,
+            "content": "每月",
+            "userConfirmed": false,
+            "value": "monthly"
+          },
+          "periodicRent": {
+            "amount": 158517,
+            "confidence": 95,
+            "content": "第四年至第六年為壹拾伍萬捌仟伍佰壹拾柒元整",
+            "userConfirmed": false
+          },
+          "timing": {
+            "confidence": 90,
+            "content": "乙方應於本契約簽訂時,依前開金額開立一年份共十二張支票予甲方,到期日為每月1日,供甲方按月兌現",
+            "userConfirmed": false,
+            "value": "advance"
+          },
+          "variableRent": {
+            "confidence": 0,
+            "content": "",
+            "hasVariable": false,
+            "type": null,
+            "userConfirmed": false
+          },
+          "variableRentPredictable": {
+            "confidence": 0,
+            "isPredictable": null,
+            "content": "",
+            "userConfirmed": false
+          },
+          "periodStartDate": {
+            "value": "2024-08-01T00:00:00.000Z",
+            "confidence": 95,
+            "content": "外櫃租賃期間自民國(下同)110年08月01日起至122年03月31日止\n第四年至第六年",
+            "userConfirmed": false
+          },
+          "periodEndDate": {
+            "value": "2027-07-31T00:00:00.000Z",
+            "confidence": 95,
+            "content": "外櫃租賃期間自民國(下同)110年08月01日起至122年03月31日止\n第四年至第六年",
+            "userConfirmed": false
+          },
+          "taxed": {
+            "confidence": 100,
+            "isTaxed": true,
+            "content": "含稅",
+            "userConfirmed": false
+          }
+        },
+        {
+          "frequency": {
+            "confidence": 90,
+            "content": "每月",
+            "userConfirmed": false,
+            "value": "monthly"
+          },
+          "periodicRent": {
+            "amount": 163273,
+            "confidence": 95,
+            "content": "第七年至第九年為壹拾陸萬參仟贰佰柒拾參元整",
+            "userConfirmed": false
+          },
+          "timing": {
+            "confidence": 90,
+            "content": "乙方應於本契約簽訂時,依前開金額開立一年份共十二張支票予甲方,到期日為每月1日,供甲方按月兌現",
+            "userConfirmed": false,
+            "value": "advance"
+          },
+          "variableRent": {
+            "confidence": 0,
+            "content": "",
+            "hasVariable": false,
+            "type": null,
+            "userConfirmed": false
+          },
+          "variableRentPredictable": {
+            "confidence": 0,
+            "isPredictable": null,
+            "content": "",
+            "userConfirmed": false
+          },
+          "periodStartDate": {
+            "value": "2027-08-01T00:00:00.000Z",
+            "confidence": 95,
+            "content": "外櫃租賃期間自民國(下同)110年08月01日起至122年03月31日止\n第七年至第九年",
+            "userConfirmed": false
+          },
+          "periodEndDate": {
+            "value": "2030-07-31T00:00:00.000Z",
+            "confidence": 95,
+            "content": "外櫃租賃期間自民國(下同)110年08月01日起至122年03月31日止\n第七年至第九年",
+            "userConfirmed": false
+          },
+          "taxed": {
+            "confidence": 100,
+            "isTaxed": true,
+            "content": "含稅",
+            "userConfirmed": false
+          }
+        },
+        {
+          "frequency": {
+            "confidence": 90,
+            "content": "每月",
+            "userConfirmed": false,
+            "value": "monthly"
+          },
+          "periodicRent": {
+            "amount": 168171,
+            "confidence": 95,
+            "content": "第十年起為壹拾陸萬捌仟壹佰柒拾壹元整",
+            "userConfirmed": false
+          },
+          "timing": {
+            "confidence": 90,
+            "content": "乙方應於本契約簽訂時,依前開金額開立一年份共十二張支票予甲方,到期日為每月1日,供甲方按月兌現",
+            "userConfirmed": false,
+            "value": "advance"
+          },
+          "variableRent": {
+            "confidence": 0,
+            "content": "",
+            "hasVariable": false,
+            "type": null,
+            "userConfirmed": false
+          },
+          "variableRentPredictable": {
+            "confidence": 0,
+            "isPredictable": null,
+            "content": "",
+            "userConfirmed": false
+          },
+          "periodStartDate": {
+            "value": "2030-08-01T00:00:00.000Z",
+            "confidence": 95,
+            "content": "外櫃租賃期間自民國(下同)110年08月01日起至122年03月31日止\n第十年起",
+            "userConfirmed": false
+          },
+          "periodEndDate": {
+            "value": "2033-03-31T00:00:00.000Z",
+            "confidence": 95,
+            "content": "外櫃租賃期間自民國(下同)110年08月01日起至122年03月31日止\n租賃期間終止",
+            "userConfirmed": false
+          },
+          "taxed": {
+            "confidence": 100,
+            "isTaxed": true,
+            "content": "含稅",
+            "userConfirmed": false
+          }
+        }
+      ]
+    },
+    "elapsed": 42.32800000000134
+  },
+  "Parse leaseJudgment Info": {
+    "task": "Parse leaseJudgment Info",
+    "status": "ok",
+    "payload": {
+      "LeaseJudgment": {
+        "assetReplaceable": {
+          "confidence": 90,
+          "content": "第一條:租賃標的\n二、外櫃之位置(含面積),甲方得因場地營業或改裝之需要予以調整異動,乙方同意無條件配合,不得異議或請求甲方予以賠(補)償。\n第六條:維修與保管責任\n一、租賃期間,非經甲方書面同意,乙方不得將外櫃之全部或部分及其衍生之權利,轉租、分租、頂讓、抵押、出借或以其他方式交予他人使用,或與他人共同使用。\n二、關於場地之結構、公共設施、公用管線及公用設備由甲方負責維修及保管,但因乙方或其受僱人、使用人或履行輔助人之故意或過失致前述物品、設施有不完整或不堪用之狀態時,應由乙方負責。乙方應盡善良管理人之注意義務以保持外櫃電力裝置、電線、電器或其他甲方提供予乙方使用之物品、設備之完整及堪用狀態,其因非可歸責於乙方之事由致前述物品、設施有不完整或不堪用之狀態時,乙方應即通知甲方,非經甲方事前書面同意,乙方不得自行修繕,否則甲方不負任何責任。\n三、乙方不得於外櫃、場地任何樓面、樓梯、樓梯間、安全門、消防栓、電梯、或防火通道等場所或公共區域,加裝設備、堆積貨物或放置危險物品或任何妨礙消防機能或成為障礙物之器具或物品,亦不得為其他妨礙公共安全或公眾利用之行為。\n四、乙方違反前二項之規定,甲方得於通知乙方後逕行拆除有害公共安全或違反相關法令規定之裝潢、其他增建物;修補受損部分結構或棄置物品。因前述行為所支出之費用由乙方負擔。\n六、乙方對外櫃之裝潢、電氣、供水或排水、照明、空調或其他任何機械或設備或管線,如需新設、變更、整修、增設或移動時,應先經主管機關核准,並檢附裝潢平面圖、施工配電圖、機械設備配置圖及相關施工圖說等資料及預計施工期間與進度表,經甲方事前書面同意,於不得損害外櫃原有之結構及影響甲方營業之前提下施工,其費用概由乙方負擔,於此甲方不負任何審查責任。",
+          "userConfirmed": false,
+          "value": false
+        },
+        "hasControlRight": {
+          "confidence": 85,
+          "content": "第七條:營業管理\n一、外櫃之營業項目,未經甲方事前書面同意不得任意變更,該外櫃之商品或服務,須符合主管機關規定安全、衛生及標示之標準,不得與甲方競業,且乙方應維護甲方商譽,不得提供、銷售、陳列劣質品或仿冒品、或有侵害智慧財產權之商品或服務,甲方得不定時稽查,如乙方違反本條規定,甲方得要求立即改善,並得隨時禁止乙方提供、販售或逕行終止本契約,另乙方應自負全部法律責任,若致生甲方損害,則應賠償甲方因此所受之一切損害及所失利益(包括但不限於訴訟費用、律師費用、商譽損失、營業損失等及因而衍生之相關費用)。\n二、乙方陳列於外櫃之任何商品與物品,概由乙方自行負責保管。外櫃之銷售方式、商品陳列或服務提供,應配合甲方整體形象為考量,甲方如認形象差異過大或有損形象時,乙方應立即改善,如未為改善,或改善不完全,甲方得隨時禁止乙方提供、販售或逕行終止本契約。\n三、外櫃之營業時間應與甲方場地營業時間配合,不得延長、縮減或變更之,亦不得任意停業,乙方如因特殊事由需辦理停業時,應以書面通知甲方,並於甲方指定之期限內復業。\n四、乙方營業所生之消費糾紛,概由乙方自行處理,且不得影響甲方之商譽及營業,如因此造成甲方損害,乙方應負擔損害賠償責任,包括但不限於和解、調解、民刑事責任、行政裁罰、律師費、訴訟費用、商譽損失、營業損失等及因而衍生之相關費用。\n五、乙方未經甲方事前書面同意,不得攀附甲方之名義從事任何行銷行為,亦不得未經甲方授權擅自使用甲方所享有之專利權、商標權、著作權、營業秘密等一切合法權利暨相關資訊、圖文,如有違反,乙方除須依法負擔法律責任外,甲方亦得逕行終止契約,並請求因此所受損害之賠償(包括但不限於調解、和解、民刑事責任、行政裁罰、律師費、商譽損失等及因而衍生之相關費用)。",
+          "userConfirmed": false,
+          "value": false
+        },
+        "isSpecificAsset": {
+          "confidence": 95,
+          "content": "第一條:租賃標的\n一、高雄市新興區復興一路8 號4樓,部份位置面積約342坪(下稱外櫃,使用範圍如附圖)。\n二、外櫃之位置(含面積),甲方得因場地營業或改裝之需要予以調整異動,乙方同意無條件配合,不得異議或請求甲方予以賠(補)償。",
+          "userConfirmed": false,
+          "value": true
+        }
+      }
+    },
+    "elapsed": 57.95300000000134
+  }
+}
