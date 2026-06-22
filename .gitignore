@@ -15,7 +15,7 @@ develop-eggs/
 *.pdf
 *.txt
 .claude
-result.txt
+results.json
 dist/
 downloads/
 eggs/
