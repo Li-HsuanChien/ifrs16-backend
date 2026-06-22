@@ -1,0 +1,33 @@
+{
+  "_comment": "Single source of truth for date-related signal phrases. Consumed by utils/datetools.py (deterministic post-processing) AND injected into the LLM extraction/parse prompts via utils/datekeywords.py, so both stages share the same vocabulary. Edit here to customize; no code change needed. Order matters for 'rentStart' (priority order).",
+
+  "rentStart": {
+    "label": "Rent commencement (distinct from lease start)",
+    "hint": "The date rent begins to accrue, which may differ from the lease commencement date (a rent-free period). Capture the date that follows these phrases.",
+    "keywords": ["租金給付始期", "起租日", "租金起算日", "租金起算", "租金計算期間自", "計租起始日", "租金計算自"]
+  },
+
+  "leaseSpanStart": {
+    "label": "Lease span opener",
+    "hint": "The lease commencement date sits between/after these markers (e.g. 自<date>起).",
+    "keywords": ["自", "起"]
+  },
+
+  "leaseSpanEnd": {
+    "label": "Lease span terminator",
+    "hint": "The lease end date sits before these markers (e.g. 至<date>止).",
+    "keywords": ["至", "止", "迄"]
+  },
+
+  "openEnded": {
+    "label": "Lease expiry (open-ended final period)",
+    "hint": "Marks a period that runs until lease expiry rather than a fixed end date.",
+    "keywords": ["屆滿", "届满", "期滿", "期满", "租約期滿", "租期屆滿", "租約屆滿"]
+  },
+
+  "relativePeriod": {
+    "label": "Relative payment periods (preserve verbatim)",
+    "hint": "Year-relative rate periods. Copy the exact phrase; downstream tools derive calendar dates from the lease/rent anchor.",
+    "keywords": ["第N年至第M年", "第N年起", "第N年"]
+  }
+}

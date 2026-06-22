@@ -36,7 +36,12 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
-from utils.llmapi import LLMClient, extraction
+try:  # support both `python utils/extraction.py` and `import utils.extraction`
+    from llmapi import LLMClient, extraction
+    from datetools import compute_date_tool_result
+except ImportError:
+    from utils.llmapi import LLMClient, extraction
+    from utils.datetools import compute_date_tool_result
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -171,17 +176,21 @@ def _invoke_with_retry(
     input_text: str,
     max_retries: int,
     backoff_base: float,
+    tool_result: Any = None,
 ) -> Any:
     """
     Run one LLM call (a single pipeline step) with retry + schema validation.
     Returns the parsed payload, or raises after exhausting retries.
+
+    `tool_result`, when given, is the deterministic ground-truth date report
+    replayed into the call as a tool result (parse step, date-bearing topics).
     """
     task_name = task_entry.get("task", "unknown")
 
     for attempt in range(1, max_retries + 1):
         try:
             log.info("[%s] attempt %d/%d", task_name, attempt, max_retries)
-            raw = extraction(client, task_entry, input_text)
+            raw = extraction(client, task_entry, input_text, tool_result=tool_result)
             payload = parse_response(raw, task_name)
             schema_error = validate_payload(payload, task_entry, task_name)
             if schema_error:
@@ -238,13 +247,22 @@ def run_task(
             client, extract_entry, contract_text, max_retries, backoff_base
         )
 
-        # Step 2 — parse/evaluate from the extracted splices
+        # Step 2 — deterministic ground-truth date tool: compute authoritative
+        # ISO dates from the RICH extract splices (ROC→CE and 第N年 derivation
+        # anchored on the rent-commencement date).  Runs here, before parse, so
+        # the resolution reads verbatim contract text rather than the lossy parse
+        # output — and the result is fed to parse as a tool result.
+        date_tool_result = compute_date_tool_result(extracted)
+
+        # Step 3 — parse/evaluate from the extracted splices, with the
+        # ground-truth dates replayed as a tool result (date-bearing topics only).
         parse_input = json.dumps(extracted, ensure_ascii=False)
-        # with open("verifi.txt", "a", encoding="utf-8") as file:
-        #     file.write(",\n")
-        #     file.write(parse_input)
+        with open("verifi.txt", "a", encoding="utf-8") as file:
+            file.write(",\n")
+            file.write(parse_input)
         payload = _invoke_with_retry(
-            client, parse_entry, parse_input, max_retries, backoff_base
+            client, parse_entry, parse_input, max_retries, backoff_base,
+            tool_result=date_tool_result,
         )
 
         elapsed = time.monotonic() - t0

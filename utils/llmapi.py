@@ -5,6 +5,11 @@ from typing import List, Dict, Any, Optional
 
 import requests
 
+try:  # shared date vocabulary (also used by the deterministic post-processor)
+    from datekeywords import build_prompt_hint, is_date_task
+except ImportError:
+    from utils.datekeywords import build_prompt_hint, is_date_task
+
 
 # ---------------------------------------------------------------------------
 # Client
@@ -39,6 +44,8 @@ class LLMClient:
         messages: List[Dict[str, str]],
         json_schema: Optional[Dict[str, Any]] = None,
         temperature: float = 0.1,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Low-level call. `messages` is a fully assembled list of
@@ -63,6 +70,14 @@ class LLMClient:
             "messages": full_messages,
             "temperature": temperature,
         }
+
+        # Tool plumbing — present so a replayed `tool` message (the deterministic
+        # date-tool result) is a well-formed turn.  tool_choice="none" forces the
+        # model to answer using the supplied result rather than call again.
+        if tools:
+            payload["tools"] = tools
+        if tool_choice is not None:
+            payload["tool_choice"] = tool_choice
 
         if json_schema:
             # Use structured outputs (json_schema) when a schema is supplied.
@@ -116,6 +131,11 @@ def build_system_prompt(task_entry: Dict[str, Any]) -> str:
         if rules_block:
             parts.append(f"\n## Reference Rules\n{rules_block}")
 
+    # Inject the shared date-keyword reference for date-bearing tasks so the
+    # model captures the same signal phrases the post-processor relies on.
+    if is_date_task(task_entry):
+        parts.append(build_prompt_hint())
+
     return "\n\n".join(parts)
 
 
@@ -164,6 +184,60 @@ def build_few_shot_messages(task_entry: Dict[str, Any]) -> List[Dict[str, str]]:
     return messages
 
 
+# Declaration for the deterministic date tool whose result is replayed into the
+# parse step.  The model never actually invokes it — we run it ourselves and
+# inject the result — but the declaration makes the replayed turn well-formed.
+GROUND_TRUTH_TOOL: Dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "compute_ground_truth_dates",
+        "description": (
+            "Deterministically converts ROC/民國 dates to ISO 8601 and derives "
+            "第N年至第M年 period dates from the rent-commencement anchor (起租日 / "
+            "租金給付始期). Returns authoritative dates that OVERRIDE any model "
+            "arithmetic."
+        ),
+        "parameters": {"type": "object", "properties": {}},
+    },
+}
+
+_GROUND_TRUTH_CALL_ID = "call_ground_truth_dates"
+
+
+def build_tool_turn(tool_result: Any) -> List[Dict[str, Any]]:
+    """
+    Build the synthetic agent tool-call turn that carries the ground-truth date
+    result into the model's context:
+
+        assistant : (calls compute_ground_truth_dates)
+        tool      : <authoritative ISO dates>
+
+    Placed right after the live user input, this mirrors an agent that read the
+    input, called the date tool, and is now about to answer using its result.
+    """
+    return [
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": _GROUND_TRUTH_CALL_ID,
+                    "type": "function",
+                    "function": {
+                        "name": "compute_ground_truth_dates",
+                        "arguments": "{}",
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": _GROUND_TRUTH_CALL_ID,
+            "content": json.dumps(tool_result, ensure_ascii=False),
+        },
+    ]
+
+
 def build_user_prompt(input_text: str, example_count: int = 0) -> Dict[str, str]:
     """
     Wraps the real input in a user message that mirrors the few-shot format.
@@ -189,6 +263,7 @@ def extraction(
     client: LLMClient,
     task_entry: Dict[str, Any],
     input_text: str,
+    tool_result: Any = None,
 ) -> Dict[str, Any]:
     """
     Runs a single LLM call for one task against `input_text`.
@@ -197,6 +272,11 @@ def extraction(
       - extraction step: `input_text` is the raw contract text
       - parse step:      `input_text` is the serialized content object produced
                          by the extraction step
+
+    When `tool_result` is supplied (parse step, date-bearing topics), a synthetic
+    tool-call turn carrying the deterministic ground-truth dates is replayed after
+    the live input — so the model answers using authoritative dates instead of
+    doing ROC arithmetic itself.
 
     Message layout sent to the API:
     ┌──────────────────────────────────────────┐
@@ -208,6 +288,8 @@ def extraction(
     │ assistant: { ...example output... }     │  ┘
     ├──────────────────────────────────────────┤
     │ user     : [Input N+1] <real input>     │  ← live input
+    │ assistant: (calls compute_ground_truth) │  ┐ tool turn (date tasks only)
+    │ tool     : <authoritative ISO dates>    │  ┘
     └──────────────────────────────────────────┘
     """
     system_prompt = build_system_prompt(task_entry)
@@ -219,12 +301,21 @@ def extraction(
 
     messages = few_shot + [live_input]
 
+    tools = None
+    tool_choice = None
+    if tool_result is not None:
+        messages += build_tool_turn(tool_result)
+        tools = [GROUND_TRUTH_TOOL]
+        tool_choice = "none"  # answer using the result; don't re-call the tool
+
     try:
         return client.generate(
             system_prompt=system_prompt,
             messages=messages,
             json_schema=task_entry.get("outputSchema"),
             temperature=0.1,
+            tools=tools,
+            tool_choice=tool_choice,
         )
     except Exception as e:
         print(f"[{task_entry.get('task', 'unknown')}] Extraction error: {e}")
