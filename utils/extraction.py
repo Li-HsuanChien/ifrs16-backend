@@ -257,9 +257,14 @@ def run_task(
         # Step 3 — parse/evaluate from the extracted splices, with the
         # ground-truth dates replayed as a tool result (date-bearing topics only).
         parse_input = json.dumps(extracted, ensure_ascii=False)
-        with open("verifi.txt", "a", encoding="utf-8") as file:
-            file.write(",\n")
-            file.write(parse_input)
+        import os
+        if os.path.exists(f"verifi.txt"):
+            with open(f"verifi.txt", "a", encoding="utf-8") as file:
+                file.write(",\n")
+                file.write(parse_input)
+        else:
+            with open(f"verifi.txt", "w", encoding="utf-8") as file:
+                file.write(parse_input)
         payload = _invoke_with_retry(
             client, parse_entry, parse_input, max_retries, backoff_base,
             tool_result=date_tool_result,

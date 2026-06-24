@@ -95,7 +95,7 @@ class LLMClient:
             self.url,
             headers=self.headers,
             data=json.dumps(payload),
-            timeout=60,
+            timeout=120,
         )
 
         if response.status_code == 200:
@@ -238,6 +238,38 @@ def build_tool_turn(tool_result: Any) -> List[Dict[str, Any]]:
     ]
 
 
+# ---------------------------------------------------------------------------
+# Callable tools (real function calling) — distinct from the pre-injected,
+# deterministic date tool above.  These the model actually invokes during the
+# parse step; we execute them and feed the result back (see _run_tool_loop).
+# ---------------------------------------------------------------------------
+
+def _load_callable_tools():
+    """
+    Lazily import the calc tool registry so llmapi <-> calctools stay decoupled
+    (calctools imports LLMClient from here; importing it lazily avoids a cycle).
+
+    Returns (registry, declarations_by_name):
+      registry            : name -> python callable
+      declarations_by_name: name -> OpenAI tool declaration dict
+    """
+    try:
+        from calctools import TOOL_REGISTRY, TOOL_DECLARATIONS
+    except ImportError:
+        from utils.calctools import TOOL_REGISTRY, TOOL_DECLARATIONS
+    decls = {d["function"]["name"]: d for d in TOOL_DECLARATIONS}
+    return TOOL_REGISTRY, decls
+
+
+def _execute_tool_call(tool_call: Dict[str, Any]) -> Dict[str, Any]:
+    """Run one model-requested callable tool and build its `tool` reply message."""
+    try:
+        from calctools import execute_tool_call
+    except ImportError:
+        from utils.calctools import execute_tool_call
+    return execute_tool_call(tool_call)
+
+
 def build_user_prompt(input_text: str, example_count: int = 0) -> Dict[str, str]:
     """
     Wraps the real input in a user message that mirrors the few-shot format.
@@ -301,23 +333,116 @@ def extraction(
 
     messages = few_shot + [live_input]
 
-    tools = None
-    tool_choice = None
+    # Pre-injected deterministic date tool (model never calls it; result replayed).
+    tools: List[Dict[str, Any]] = []
     if tool_result is not None:
         messages += build_tool_turn(tool_result)
-        tools = [GROUND_TRUTH_TOOL]
-        tool_choice = "none"  # answer using the result; don't re-call the tool
+        tools.append(GROUND_TRUTH_TOOL)
+
+    # Callable tools the model may actually invoke (e.g. add_numbers).  Declared
+    # per-task via "callTools": ["add_numbers", ...] in parsecalls.json.
+    callable_names = task_entry.get("callTools") or []
+    registry: Dict[str, Any] = {}
+    if callable_names:
+        registry, decls = _load_callable_tools()
+        for name in callable_names:
+            if name in decls:
+                tools.append(decls[name])
 
     try:
+        if callable_names:
+            # Real function calling: loop call→execute→feed-back, then lock the
+            # final answer to the output schema.
+            return _run_tool_loop(
+                client, system_prompt, messages, task_entry, tools, registry
+            )
+
+        # Single pass (current behaviour for date / no-tool tasks).
+        tool_choice = "none" if tools else None
         return client.generate(
             system_prompt=system_prompt,
             messages=messages,
             json_schema=task_entry.get("outputSchema"),
             temperature=0.1,
-            tools=tools,
+            tools=tools or None,
             tool_choice=tool_choice,
         )
     except Exception as e:
         print(f"[{task_entry.get('task', 'unknown')}] Extraction error: {e}")
         return None
+
+
+def _run_tool_loop(
+    client: LLMClient,
+    system_prompt: str,
+    messages: List[Dict[str, Any]],
+    task_entry: Dict[str, Any],
+    tools: List[Dict[str, Any]],
+    registry: Dict[str, Any],
+    max_tool_turns: int = 5,
+) -> Dict[str, Any]:
+    """
+    Drive a real function-calling conversation for one parse step.
+
+    Why a loop (vs the single-pass date pattern): the model must *choose* which
+    figures to add — distinguishing fee line items from dates / article numbers,
+    a semantic judgement that is its strength — while the tool does the
+    arithmetic the model gets wrong (e.g. 2,000+11,700+468+500 = 14,668, not the
+    36,000 it once hallucinated).
+
+    Flow:
+      1. Loop with tools enabled (tool_choice="auto") and NO schema lock, so the
+         model is free to emit tool_calls.  Each call is executed and its result
+         fed back.  We stop once the model answers without calling a tool, or
+         after max_tool_turns.
+      2. One final schema-locked turn (tool_choice="none") turns the gathered
+         results into the structured JSON the pipeline expects.
+
+    Keeping the schema off during the loop avoids the strict-structured-output /
+    tool-call conflict some Azure API versions exhibit.
+    """
+    work = list(messages)
+
+    for _turn in range(max_tool_turns):
+        raw = client.generate(
+            system_prompt=system_prompt,
+            messages=work,
+            json_schema=None,             # don't lock to schema while tools may fire
+            temperature=0.1,
+            tools=tools,
+            tool_choice="auto",
+        )
+        message = raw["choices"][0]["message"]
+        work.append(message)
+
+        tool_calls = message.get("tool_calls")
+        if not tool_calls:
+            break  # model answered without a tool — go lock the schema
+
+        for tool_call in tool_calls:
+            name = tool_call.get("function", {}).get("name")
+            if name in registry:
+                work.append(_execute_tool_call(tool_call))
+            else:
+                # e.g. the model tries to re-call the pre-injected date tool;
+                # remind it the result is already in context.
+                work.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.get("id"),
+                    "content": json.dumps(
+                        {"note": f"{name} result already provided above"},
+                        ensure_ascii=False,
+                    ),
+                })
+
+    # Final schema-locked synthesis turn — emit the structured payload using the
+    # tool results now in context.
+    return client.generate(
+        system_prompt=system_prompt,
+        messages=work,
+        json_schema=task_entry.get("outputSchema"),
+        temperature=0.1,
+        tools=tools,
+        tool_choice="none",
+    )
 

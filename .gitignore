@@ -15,7 +15,10 @@ develop-eggs/
 *.pdf
 *.txt
 .claude
-results.json
+run_samples.py
+result*.json
+results*.json
+sample/
 dist/
 downloads/
 eggs/
